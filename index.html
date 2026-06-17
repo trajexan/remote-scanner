@@ -9,17 +9,31 @@
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-  .log-line { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-  .scan-container { background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
-  video { width: 100%; height: 100%; object-fit: cover; }
-
-  /* Disable double-tap zoom on iOS Safari */
-  html, body {
-    touch-action: manipulation;
+  .log-line { 
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+  }
+  
+  .scan-container { 
+    background: #000; 
+    border-radius: 16px; 
+    overflow: hidden; 
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); 
+  }
+  
+  video { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
   }
 
+  /* Disable double-tap zoom (especially after camera starts) */
+  html, body, 
+  .scan-container, 
+  video, 
+  #scanGuide,
   button {
-    touch-action: manipulation;
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
   }
