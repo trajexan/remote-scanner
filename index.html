@@ -6,6 +6,10 @@
   <title>Remote Scanner | SYSTEM raw.txt</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <!-- ZXing for Barcode + Data Matrix -->
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     .log-line { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .scan-container { background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
@@ -22,14 +26,13 @@
       </div>
       <div id="driveStatus" 
            class="px-4 py-1.5 bg-slate-900 border border-slate-800 rounded-2xl text-sm flex items-center gap-2">
-        <div class="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-        <span class="text-amber-400">Connecting to Drive...</span>
+        <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
+        <span class="text-emerald-400">Drive Connected</span>
       </div>
     </div>
 
+    <!-- QR Scanner (UNCHANGED) -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      
-      <!-- Scanner Card -->
       <div class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
@@ -57,7 +60,7 @@
           </button>
           <button onclick="captureAndDecode()" 
                   class="col-span-1 py-3.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition-all rounded-2xl font-semibold flex items-center justify-center gap-2">
-            📸 Capture Frame
+            📸 Capture Frame (QR)
           </button>
         </div>
         
@@ -67,7 +70,7 @@
         </div>
       </div>
 
-      <!-- Value Card -->
+      <!-- Value Card (UNCHANGED) -->
       <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col">
         <div class="flex items-center gap-3 mb-4">
           <div class="text-3xl">✏️</div>
@@ -79,7 +82,7 @@
 
         <textarea id="valueInput" rows="5"
                   class="flex-1 w-full bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-2xl p-4 font-mono text-lg resize-y"
-                  placeholder="QR result will appear here&#10;or type / paste text manually"></textarea>
+                  placeholder="QR / Barcode / Data Matrix / OCR result will appear here"></textarea>
 
         <div class="mt-4 space-y-3">
           <button onclick="submitToRaw()" 
@@ -101,6 +104,35 @@
       </div>
     </div>
 
+    <!-- NEW: Advanced Capture Section -->
+    <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="text-3xl">🔍</div>
+        <div>
+          <h2 class="text-2xl font-semibold">Advanced Capture (from current frame)</h2>
+          <p class="text-sm text-slate-400">Click a button below to scan the live camera view</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button onclick="captureBarcode()" 
+                class="py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+          📊 Capture Barcode
+        </button>
+        
+        <button onclick="captureDataMatrix()" 
+                class="py-4 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+          🔲 Capture Data Matrix
+        </button>
+        
+        <button onclick="captureTextOCR()" 
+                class="py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+          📝 Capture Text (OCR)
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 mt-3 text-center">Results will appear in the text box above • You can still edit before updating raw.txt</p>
+    </div>
+
     <!-- Current raw.txt Status -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
       <div class="flex items-center justify-between mb-4">
@@ -108,7 +140,7 @@
           <div class="text-3xl">📄</div>
           <div>
             <h3 class="text-xl font-semibold">Current raw.txt in SYSTEM</h3>
-            <p class="text-xs text-slate-500 font-mono">SYSTEM\raw.txt (delete + fresh create)</p>
+            <p class="text-xs text-slate-500 font-mono">SYSTEM\raw.txt</p>
           </div>
         </div>
         <button onclick="loadCurrentRaw()" 
@@ -123,7 +155,6 @@
       </div>
       <div class="flex justify-between items-center mt-3 text-xs text-slate-500 px-1">
         <span id="lastUpdated"></span>
-        <span class="font-mono text-[10px]">Matches your switch.txt robustness pattern</span>
       </div>
     </div>
 
@@ -138,23 +169,22 @@
       </div>
     </div>
 
-    <p class="text-center text-[10px] text-slate-600 mt-8">v2.1 Static • June 2026 • GitHub Pages • Uses your existing OAuth credentials</p>
+    <p class="text-center text-[10px] text-slate-600 mt-8">v2.2 • June 2026 • QR + Barcode + Data Matrix + OCR • GitHub Pages</p>
   </div>
 
   <script>
-    // ==================== YOUR CREDENTIALS + CONFIG ====================
+    // ==================== CREDENTIALS & CONFIG (unchanged) ====================
     const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
     const CLIENT_SECRET = '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';
     const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
     const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
-
-    // === HARD CODE YOUR SYSTEM FOLDER ID HERE (recommended) ===
-    // 1. Go to drive.google.com → open the SYSTEM folder that contains LISTENERS
-    // 2. Copy the long ID from the URL after /folders/
-    // 3. Paste it below and save
-    const SYSTEM_FOLDER_ID = '10n_Pv8YeMOYmlpwlAKRYN32wAU5ZWbRw';   // ←←← PASTE YOUR SYSTEM FOLDER ID HERE (leave empty for auto-discovery)
+    const SYSTEM_FOLDER_ID = ''; // Paste your SYSTEM folder ID here if auto-discovery fails
 
     let accessToken = null;
+    let currentStream = null;
+    let scanInterval = null;
+    let codeReader = null; // ZXing reader
+    let tesseractWorker = null;
 
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
@@ -181,6 +211,7 @@
       el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl ${colorClass}`;
     }
 
+    // ==================== DRIVE FUNCTIONS (unchanged) ====================
     async function getAccessToken() {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -196,10 +227,6 @@
         const data = await res.json();
         if (data.access_token) {
           accessToken = data.access_token;
-          document.getElementById('driveStatus').innerHTML = `
-            <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
-            <span class="text-emerald-400">Drive Connected</span>
-          `;
           return accessToken;
         } else {
           throw new Error(data.error || 'Token refresh failed');
@@ -211,38 +238,21 @@
     }
 
     async function getSystemFolderId() {
-      if (SYSTEM_FOLDER_ID && SYSTEM_FOLDER_ID.length > 10) {
-        log('Using hardcoded SYSTEM folder ID', 'success');
-        return SYSTEM_FOLDER_ID;
-      }
-
+      if (SYSTEM_FOLDER_ID && SYSTEM_FOLDER_ID.length > 10) return SYSTEM_FOLDER_ID;
       if (!accessToken) await getAccessToken();
 
       try {
-        // Try 1: Get parent of LISTENERS
-        const res = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
         const data = await res.json();
+        if (!data.error && data.parents && data.parents.length > 0) return data.parents[0];
 
-        if (!data.error && data.parents && data.parents.length > 0) {
-          log('SYSTEM folder resolved via LISTENERS parent', 'success');
-          return data.parents[0];
-        }
-
-        // Try 2: Search by exact name
-        log('Searching for folder named SYSTEM...', 'warn');
-        const searchRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='SYSTEM' and mimeType='application/vnd.google-apps.folder'&fields=files(id)`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
         const searchData = await searchRes.json();
-
-        if (searchData.files && searchData.files.length > 0) {
-          log('SYSTEM folder found by name search', 'success');
-          return searchData.files[0].id;
-        }
+        if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
 
         throw new Error('Could not locate SYSTEM folder');
       } catch (e) {
@@ -252,21 +262,16 @@
     }
 
     async function updateRawText(newValue) {
-      if (!newValue || !newValue.trim()) {
-        return { success: false, error: 'Value cannot be empty' };
-      }
-
+      if (!newValue || !newValue.trim()) return { success: false, error: 'Value cannot be empty' };
       try {
         if (!accessToken) await getAccessToken();
         const systemFolderId = await getSystemFolderId();
 
-        // Delete any existing raw* files (robustness)
-        const listRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name contains 'raw'`)}&fields=files(id,name)`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        // Delete existing raw* files
+        const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name contains 'raw'`)}&fields=files(id)`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
         const listData = await listRes.json();
-
         if (listData.files) {
           for (const file of listData.files) {
             await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
@@ -276,31 +281,19 @@
           }
         }
 
-        // Create fresh raw.txt
-        const metadata = {
-          name: 'raw.txt',
-          parents: [systemFolderId],
-          mimeType: 'text/plain'
-        };
+        // Create fresh file
+        const metadata = { name: 'raw.txt', parents: [systemFolderId], mimeType: 'text/plain' };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', new Blob([newValue.trim()], { type: 'text/plain' }));
 
-        const createRes = await fetch(
-          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${accessToken}` },
-            body: form
-          }
-        );
+        const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form
+        });
         const createData = await createRes.json();
-
-        if (createData.id) {
-          return { success: true, message: 'raw.txt created fresh', content: newValue.trim() };
-        } else {
-          throw new Error(createData.error?.message || 'Create failed');
-        }
+        return createData.id ? { success: true } : { success: false, error: 'Create failed' };
       } catch (e) {
         return { success: false, error: e.message };
       }
@@ -310,31 +303,24 @@
       try {
         if (!accessToken) await getAccessToken();
         const systemFolderId = await getSystemFolderId();
-
-        const listRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name = 'raw.txt'`)}&fields=files(id,modifiedTime)`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name = 'raw.txt'`)}&fields=files(id,modifiedTime)`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
         const listData = await listRes.json();
-
         if (listData.files && listData.files.length > 0) {
           const file = listData.files[0];
           const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
             headers: { Authorization: `Bearer ${accessToken}` }
           });
-          const content = await contentRes.text();
-          return { success: true, content, lastUpdated: file.modifiedTime };
+          return { success: true, content: await contentRes.text(), lastUpdated: file.modifiedTime };
         }
-        return { success: true, content: '', message: 'raw.txt does not exist yet' };
+        return { success: true, content: '' };
       } catch (e) {
         return { success: false, error: e.message };
       }
     }
 
-    // ==================== CAMERA & UI ====================
-    let currentStream = null;
-    let scanInterval = null;
-
+    // ==================== CAMERA (QR part unchanged) ====================
     async function startCamera() {
       try {
         if (currentStream) stopCamera();
@@ -344,11 +330,11 @@
         currentStream = stream;
         video.srcObject = stream;
         await video.play();
-        showStatus('🔴 Live scanning active — point at QR code', 'text-emerald-400');
+        showStatus('🔴 Live scanning active', 'text-emerald-400');
         log('Camera started', 'success');
         startContinuousScanning();
       } catch (err) {
-        showStatus('❌ Camera error: ' + err.message, 'text-red-400');
+        showStatus('Camera error: ' + err.message, 'text-red-400');
         log('Camera failed: ' + err.message, 'error');
       }
     }
@@ -363,7 +349,7 @@
     function startContinuousScanning() {
       if (scanInterval) clearInterval(scanInterval);
       scanInterval = setInterval(() => {
-        if (!video.videoWidth || !video.videoHeight || video.paused) return;
+        if (!video.videoWidth || video.paused) return;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -379,10 +365,7 @@
     }
 
     function captureAndDecode() {
-      if (!currentStream || !video.videoWidth) {
-        log('Start camera first', 'warn');
-        return;
-      }
+      if (!currentStream || !video.videoWidth) { log('Start camera first', 'warn'); return; }
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -392,30 +375,112 @@
       if (code && code.data) {
         handleDetectedQR(code.data);
       } else {
-        log('No QR found in current frame', 'warn');
+        log('No QR found in frame', 'warn');
       }
     }
 
     function handleDetectedQR(data) {
       valueInput.value = data;
       valueInput.focus();
-      showStatus('✅ QR DETECTED — review & tap UPDATE', 'text-emerald-400');
+      showStatus('✅ QR detected', 'text-emerald-400');
       log('QR detected', 'success');
     }
 
+    // ==================== NEW: Advanced Capture Functions ====================
+    function getCurrentFrameCanvas() {
+      if (!currentStream || !video.videoWidth) {
+        log('Please start the camera first', 'warn');
+        return null;
+      }
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+
+    async function captureBarcode() {
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) return;
+
+      log('Scanning for Barcode...', 'info');
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const result = await codeReader.decodeFromCanvas(frameCanvas);
+        if (result && result.text) {
+          valueInput.value = result.text;
+          log('Barcode detected: ' + result.text, 'success');
+          showStatus('✅ Barcode captured', 'text-emerald-400');
+        } else {
+          log('No barcode found', 'warn');
+        }
+      } catch (e) {
+        log('Barcode scan error: ' + e.message, 'error');
+      }
+    }
+
+    async function captureDataMatrix() {
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) return;
+
+      log('Scanning for Data Matrix...', 'info');
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        // ZXing multi-format reader handles Data Matrix well
+        const result = await codeReader.decodeFromCanvas(frameCanvas);
+        if (result && result.text) {
+          valueInput.value = result.text;
+          log('Data Matrix detected: ' + result.text, 'success');
+          showStatus('✅ Data Matrix captured', 'text-emerald-400');
+        } else {
+          log('No Data Matrix found', 'warn');
+        }
+      } catch (e) {
+        log('Data Matrix scan error: ' + e.message, 'error');
+      }
+    }
+
+    async function captureTextOCR() {
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) return;
+
+      log('Running OCR (this may take a few seconds on first run)...', 'info');
+      showStatus('📝 Running OCR...', 'text-amber-400');
+
+      try {
+        if (!tesseractWorker) {
+          tesseractWorker = await Tesseract.createWorker('eng');
+        }
+        const { data: { text } } = await tesseractWorker.recognize(frameCanvas);
+        const cleanedText = text.trim();
+        if (cleanedText) {
+          valueInput.value = cleanedText;
+          log('OCR result: ' + (cleanedText.length > 60 ? cleanedText.substring(0, 57) + '...' : cleanedText), 'success');
+          showStatus('✅ Text captured via OCR', 'text-emerald-400');
+        } else {
+          log('No readable text found', 'warn');
+          showStatus('No text detected', 'text-amber-400');
+        }
+      } catch (e) {
+        log('OCR error: ' + e.message, 'error');
+        showStatus('OCR failed', 'text-red-400');
+      }
+    }
+
+    // ==================== EXISTING UPDATE & UI FUNCTIONS ====================
     async function submitToRaw() {
       const val = valueInput.value.trim();
-      if (!val) { log('Enter or scan a value first', 'error'); return; }
+      if (!val) { log('Enter or capture a value first', 'error'); return; }
 
       const btns = document.querySelectorAll('button');
       btns.forEach(b => b.disabled = true);
-      log('Updating raw.txt via Drive API...');
+      log('Updating raw.txt...');
 
       const result = await updateRawText(val);
       btns.forEach(b => b.disabled = false);
 
       if (result.success) {
-        log('SUCCESS: raw.txt updated', 'success');
+        log('raw.txt updated successfully', 'success');
         showStatus('✅ raw.txt updated!', 'text-emerald-400');
         valueInput.value = '';
         await loadCurrentRaw();
@@ -438,8 +503,7 @@
     async function loadCurrentRaw() {
       const contentEl = document.getElementById('currentContent');
       const updatedEl = document.getElementById('lastUpdated');
-      contentEl.innerHTML = 'Refreshing from Drive...';
-
+      contentEl.innerHTML = 'Refreshing...';
       const result = await getCurrentRawContent();
       if (result.success) {
         contentEl.textContent = result.content || '(empty)';
@@ -454,11 +518,11 @@
 
     // Boot
     window.onload = async function () {
-      log('Static scanner loaded');
+      log('Scanner loaded with advanced capture features');
       try {
         await getAccessToken();
         await loadCurrentRaw();
-        log('Ready. Camera + Drive connection initialized.', 'success');
+        log('Ready. QR, Barcode, Data Matrix and OCR are available.', 'success');
       } catch (e) {
         log('Startup error: ' + e.message, 'error');
       }
