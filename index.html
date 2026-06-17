@@ -50,14 +50,19 @@
         </div>
 
         <div class="grid grid-cols-3 gap-3">
+          <!-- Start / Stop Toggle -->
           <button onclick="startCamera()" 
                   class="col-span-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-2">
             ▶ Start Camera
           </button>
-          <button onclick="stopCamera()" 
-                  class="col-span-1 py-3.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 transition-all rounded-2xl font-semibold flex items-center justify-center gap-2">
-            ■ Stop
+
+          <!-- All-in-One Capture (replaced Stop button) -->
+          <button onclick="captureAllInOne()" 
+                  class="col-span-1 py-3.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-2">
+            🔍 All-in-One
           </button>
+
+          <!-- Manual QR Capture -->
           <button onclick="captureAndDecode()" 
                   class="col-span-1 py-3.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition-all rounded-2xl font-semibold flex items-center justify-center gap-2">
             📸 Capture Frame (QR)
@@ -104,21 +109,50 @@
       </div>
     </div>
 
-    <!-- NEW: Advanced Capture Section -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <!-- All-in-One Button -->
-        <button onclick="captureAllInOne()" 
-                class="col-span-1 py-5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-lg">
-          🔍 All-in-One Capture<br>
-          <span class="text-sm font-normal">(QR → Barcode → Data Matrix)</span>
+    <!-- Advanced Capture Section -->
+    <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="text-3xl">🔍</div>
+        <div>
+          <h2 class="text-2xl font-semibold">Advanced Capture (from current frame)</h2>
+          <p class="text-sm text-slate-400">Click a button to scan the live camera view</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Barcode -->
+        <button onclick="captureBarcode()" 
+                class="py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+          📊 Capture Barcode
         </button>
         
-        <!-- OCR stays separate -->
+        <!-- Data Matrix -->
+        <button onclick="captureDataMatrix()" 
+                class="py-4 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+          🔲 Capture Data Matrix
+        </button>
+        
+        <!-- OCR (kept separate) -->
         <button onclick="captureTextOCR()" 
-                class="col-span-1 py-5 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+                class="py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
           📝 Capture Text (OCR)
         </button>
       </div>
+
+      <!-- Placeholder space for future All-in-One button -->
+      <!-- 
+      <div class="mt-4">
+        <button onclick="captureAllInOne()" 
+                class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-3">
+          🔍 All-in-One Capture (QR → Barcode → DM)
+        </button>
+      </div>
+      -->
+
+      <p class="text-xs text-slate-500 mt-3 text-center">
+        Results appear in the text box above • You can still edit before updating raw.txt
+      </p>
+    </div>
 
     <!-- Current raw.txt Status -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
@@ -317,8 +351,13 @@
 
     // ==================== CAMERA (QR part unchanged) ====================
     async function startCamera() {
+      if (currentStream) {
+        // Camera is already running → Stop it
+        stopCamera();
+        return;
+      }
+
       try {
-        if (currentStream) stopCamera();
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
