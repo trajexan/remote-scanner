@@ -399,20 +399,25 @@
       return canvas;
     }
 
-    async function captureBarcode() {
+async function captureBarcode() {
       const frameCanvas = getCurrentFrameCanvas();
       if (!frameCanvas) return;
 
       log('Scanning for Barcode...', 'info');
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const result = await codeReader.decodeFromCanvas(frameCanvas);
+
+        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+
+        const result = await codeReader.decodeFromImageData(imageData);
+
         if (result && result.text) {
           valueInput.value = result.text;
           log('Barcode detected: ' + result.text, 'success');
           showStatus('✅ Barcode captured', 'text-emerald-400');
         } else {
-          log('No barcode found', 'warn');
+          log('No barcode found in frame', 'warn');
         }
       } catch (e) {
         log('Barcode scan error: ' + e.message, 'error');
@@ -426,14 +431,18 @@
       log('Scanning for Data Matrix...', 'info');
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        // ZXing multi-format reader handles Data Matrix well
-        const result = await codeReader.decodeFromCanvas(frameCanvas);
+
+        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+
+        const result = await codeReader.decodeFromImageData(imageData);
+
         if (result && result.text) {
           valueInput.value = result.text;
           log('Data Matrix detected: ' + result.text, 'success');
           showStatus('✅ Data Matrix captured', 'text-emerald-400');
         } else {
-          log('No Data Matrix found', 'warn');
+          log('No Data Matrix found in frame', 'warn');
         }
       } catch (e) {
         log('Data Matrix scan error: ' + e.message, 'error');
