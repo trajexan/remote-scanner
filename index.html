@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Remote Scanner | SYSTEM raw.txt</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -433,23 +433,22 @@
       return canvas;
     }
 
-        async function captureBarcode() {
+    async function captureBarcode() {
+      const btn = event.currentTarget;
+      if (btn) btn.disabled = true;
+
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) return;
+      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
 
       log('Scanning for Barcode...', 'info');
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-
         const dataUrl = frameCanvas.toDataURL('image/png');
-
-        // Create temporary image element (most reliable method)
         const img = new Image();
         img.src = dataUrl;
         await new Promise(resolve => { img.onload = resolve; });
 
         const result = await codeReader.decodeFromImage(img);
-
         if (result && result.text) {
           valueInput.value = result.text;
           log('Barcode detected: ' + result.text, 'success');
@@ -459,26 +458,27 @@
         }
       } catch (e) {
         log('Barcode scan error: ' + e.message, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
     async function captureDataMatrix() {
+      const btn = event.currentTarget;
+      if (btn) btn.disabled = true;
+
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) return;
+      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
 
       log('Scanning for Data Matrix...', 'info');
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-
         const dataUrl = frameCanvas.toDataURL('image/png');
-
-        // Create temporary image element
         const img = new Image();
         img.src = dataUrl;
         await new Promise(resolve => { img.onload = resolve; });
 
         const result = await codeReader.decodeFromImage(img);
-
         if (result && result.text) {
           valueInput.value = result.text;
           log('Data Matrix detected: ' + result.text, 'success');
@@ -488,7 +488,71 @@
         }
       } catch (e) {
         log('Data Matrix scan error: ' + e.message, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
       }
+    }
+
+    async function captureAllInOne() {
+      const btn = event.currentTarget;
+      if (btn) btn.disabled = true;
+
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
+
+      log('All-in-One capture started...', 'info');
+
+      // Try QR
+      try {
+        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+        if (qrResult && qrResult.data) {
+          valueInput.value = qrResult.data;
+          log('All-in-One: QR detected', 'success');
+          showStatus('✅ QR captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
+          return;
+        }
+      } catch (e) {}
+
+      // Try Barcode
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const dataUrl = frameCanvas.toDataURL('image/png');
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise(resolve => { img.onload = resolve; });
+        const result = await codeReader.decodeFromImage(img);
+        if (result && result.text) {
+          valueInput.value = result.text;
+          log('All-in-One: Barcode detected', 'success');
+          showStatus('✅ Barcode captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
+          return;
+        }
+      } catch (e) {}
+
+      // Try Data Matrix
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const dataUrl = frameCanvas.toDataURL('image/png');
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise(resolve => { img.onload = resolve; });
+        const result = await codeReader.decodeFromImage(img);
+        if (result && result.text) {
+          valueInput.value = result.text;
+          log('All-in-One: Data Matrix detected', 'success');
+          showStatus('✅ Data Matrix captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
+          return;
+        }
+      } catch (e) {}
+
+      log('All-in-One: No code found', 'warn');
+      showStatus('No code detected', 'text-amber-400');
+      if (btn) btn.disabled = false;
     }
 
     async function captureTextOCR() {
@@ -605,69 +669,66 @@
       });
     }
 
-    async function captureAllInOne() {
+async function captureAllInOne() {
+      const btn = event.currentTarget;
+      if (btn) btn.disabled = true;
+
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) return;
+      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
 
       log('All-in-One capture started...', 'info');
 
-      // Step 1: Try QR first (fast)
+      // Try QR
       try {
         const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
         const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-
         if (qrResult && qrResult.data) {
           valueInput.value = qrResult.data;
           log('All-in-One: QR detected', 'success');
-          showStatus('✅ QR captured (All-in-One)', 'text-emerald-400');
+          showStatus('✅ QR captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
           return;
         }
-      } catch (e) {
-        log('QR check error: ' + e.message, 'warn');
-      }
+      } catch (e) {}
 
-      // Step 2: Try Barcode
+      // Try Barcode
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
         const dataUrl = frameCanvas.toDataURL('image/png');
         const img = new Image();
         img.src = dataUrl;
         await new Promise(resolve => { img.onload = resolve; });
-
-        const barcodeResult = await codeReader.decodeFromImage(img);
-        if (barcodeResult && barcodeResult.text) {
-          valueInput.value = barcodeResult.text;
+        const result = await codeReader.decodeFromImage(img);
+        if (result && result.text) {
+          valueInput.value = result.text;
           log('All-in-One: Barcode detected', 'success');
-          showStatus('✅ Barcode captured (All-in-One)', 'text-emerald-400');
+          showStatus('✅ Barcode captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
           return;
         }
-      } catch (e) {
-        log('Barcode check error: ' + e.message, 'warn');
-      }
+      } catch (e) {}
 
-      // Step 3: Try Data Matrix
+      // Try Data Matrix
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
         const dataUrl = frameCanvas.toDataURL('image/png');
         const img = new Image();
         img.src = dataUrl;
         await new Promise(resolve => { img.onload = resolve; });
-
-        const dmResult = await codeReader.decodeFromImage(img);
-        if (dmResult && dmResult.text) {
-          valueInput.value = dmResult.text;
+        const result = await codeReader.decodeFromImage(img);
+        if (result && result.text) {
+          valueInput.value = result.text;
           log('All-in-One: Data Matrix detected', 'success');
-          showStatus('✅ Data Matrix captured (All-in-One)', 'text-emerald-400');
+          showStatus('✅ Data Matrix captured', 'text-emerald-400');
+          if (btn) btn.disabled = false;
           return;
         }
-      } catch (e) {
-        log('Data Matrix check error: ' + e.message, 'warn');
-      }
+      } catch (e) {}
 
-      // Nothing found
-      log('All-in-One: No code found in frame', 'warn');
+      log('All-in-One: No code found', 'warn');
       showStatus('No code detected', 'text-amber-400');
+      if (btn) btn.disabled = false;
     }
   </script>
 </body>
