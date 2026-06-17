@@ -206,18 +206,46 @@
       }
     }
 
-    async function getSystemFolderId() {
-      if (!accessToken) await getAccessToken();
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const data = await res.json();
-      if (data.parents && data.parents.length > 0) {
-        return data.parents[0];
-      }
-      throw new Error('Could not find SYSTEM folder');
+async function getSystemFolderId() {
+  if (!accessToken) await getAccessToken();
+  
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const data = await res.json();
+
+    if (data.error) {
+      log('Drive API error (parents): ' + JSON.stringify(data.error), 'error');
+      throw new Error(data.error.message || 'Drive API error getting parents');
     }
+
+    if (data.parents && data.parents.length > 0) {
+      log('SYSTEM folder ID resolved via parents: ' + data.parents[0], 'success');
+      return data.parents[0];
+    }
+
+    // Fallback: search by name "SYSTEM"
+    log('No parents returned — searching by folder name "SYSTEM"...', 'warn');
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM'&fields=files(id,name)`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const searchData = await searchRes.json();
+
+    if (searchData.files && searchData.files.length > 0) {
+      const folderId = searchData.files[0].id;
+      log('SYSTEM folder found by name search: ' + folderId, 'success');
+      return folderId;
+    }
+
+    throw new Error('Could not locate SYSTEM folder by parents or name search');
+  } catch (e) {
+    log('getSystemFolderId failed: ' + e.message, 'error');
+    throw e;
+  }
+}
 
     async function updateRawText(newValue) {
       if (!newValue || !newValue.trim()) {
