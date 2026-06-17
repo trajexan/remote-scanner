@@ -230,8 +230,6 @@
       btn.innerHTML = text;
       btn.disabled = true;
       btn.classList.add('!bg-slate-700', 'cursor-wait');
-
-      enableScanBlocker();           // ← This blocks double-tap zoom
     }
 
     function resetButtonState(btn) {
@@ -239,8 +237,6 @@
       btn.innerHTML = btn.dataset.originalText || 'Capture';
       btn.disabled = false;
       btn.classList.remove('!bg-slate-700', 'cursor-wait');
-
-      disableScanBlocker();          // ← Re-enable everything
     }
 
     function showScanGuide(type = 'all') {
@@ -556,36 +552,53 @@
         return;
       }
 
-      log('All-in-One capture started...', 'info');
-      try {
-        // Try QR
-        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
-        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
-        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-        if (qrResult && qrResult.data) {
-          valueInput.value = qrResult.data;
-          log('All-in-One: QR detected', 'success');
-          showStatus('✅ QR captured', 'text-emerald-400');
-          return;
+      log('All-in-One capture started (max 5 attempts)...', 'info');
+
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        log(`Attempt ${attempt}/5`, 'info');
+
+        try {
+          // Try QR
+          const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+          const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+          const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+          if (qrResult && qrResult.data && qrResult.data.length > 0) {
+            valueInput.value = qrResult.data;
+            log(`All-in-One: QR detected on attempt ${attempt}`, 'success');
+            showStatus('✅ QR captured', 'text-emerald-400');
+            resetButtonState(btn);
+            hideScanGuide();
+            return;
+          }
+
+          // Try Barcode + Data Matrix
+          const preprocessed = preprocessCanvas(frameCanvas);
+          if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+          const result = await tryDecodeWithRotations(preprocessed, codeReader);
+
+          if (result && result.text && result.text.length > 0) {
+            valueInput.value = result.text;
+            log(`All-in-One: Code detected on attempt ${attempt}`, 'success');
+            showStatus('✅ Code captured', 'text-emerald-400');
+            resetButtonState(btn);
+            hideScanGuide();
+            return;
+          }
+        } catch (e) {
+          log(`Attempt ${attempt} error: ${e.message}`, 'warn');
         }
 
-        // Try Barcode + Data Matrix
-        const preprocessed = preprocessCanvas(frameCanvas);
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const result = await tryDecodeWithRotations(preprocessed, codeReader);
-        if (result && result.text) {
-          valueInput.value = result.text;
-          log('All-in-One: Code detected', 'success');
-          showStatus('✅ Code captured', 'text-emerald-400');
-          return;
+        // Small delay between attempts (optional but recommended)
+        if (attempt < 5) {
+          await new Promise(resolve => setTimeout(resolve, 120));
         }
-
-        log('All-in-One: No code found', 'warn');
-        showStatus('No code detected', 'text-amber-400');
-      } finally {
-        resetButtonState(btn);
-        hideScanGuide();
       }
+
+      // All attempts failed
+      log('All-in-One: No code found after 5 attempts', 'warn');
+      showStatus('No code detected after 5 attempts', 'text-amber-400');
+      resetButtonState(btn);
+      hideScanGuide();
     }
 
     async function captureTextOCR() {
@@ -729,20 +742,6 @@
         submitToRaw();
       }
     });
-        function enableScanBlocker() {
-      const blocker = document.getElementById('scanBlocker');
-      if (blocker) blocker.classList.remove('hidden');
-    }
-
-    function disableScanBlocker() {
-      const blocker = document.getElementById('scanBlocker');
-      if (blocker) blocker.classList.add('hidden');
-    }
   </script>
-    <!-- Full Screen Blocker (prevents double-tap zoom on iOS Safari) -->
-  <div id="scanBlocker" 
-       class="hidden fixed inset-0 z-[9999]"
-       style="background: rgba(0,0,0,0.15); touch-action: none;">
-  </div>
 </body>
 </html>
