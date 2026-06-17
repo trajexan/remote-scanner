@@ -472,9 +472,12 @@
       finally { resetButtonState(btn); hideScanGuide(); }
     }
 
+    let isAllInOneRunning = false;
+
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
+      // If already running → Stop it
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
         log('All-in-One stopped by user', 'warn');
@@ -484,25 +487,32 @@
         return;
       }
 
-      if (!confirmClearIfNeeded()) { resetButtonState(btn); return; }
+      // Confirmation before starting
+      if (!confirmClearIfNeeded()) {
+        resetButtonState(btn);
+        return;
+      }
+
       valueInput.value = '';
 
       isAllInOneRunning = true;
       setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
       showScanGuide('all');
 
-      const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) {
-        isAllInOneRunning = false;
-        resetButtonState(btn); hideScanGuide(); return;
-      }
-
-      log('All-in-One started (max 100 attempts)', 'info');
+      log('All-in-One started (fresh frame every attempt)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
         if (!isAllInOneRunning) break;
 
+        // === Capture FRESH frame every attempt ===
+        const frameCanvas = getCurrentFrameCanvas();
+        if (!frameCanvas) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+
         try {
+          // Try QR
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -513,9 +523,12 @@
             showStatus('✅ QR captured', 'text-emerald-400');
             clearStatusAfter(2000);
             isAllInOneRunning = false;
-            resetButtonState(btn); hideScanGuide(); return;
+            resetButtonState(btn);
+            hideScanGuide();
+            return;
           }
 
+          // Try Barcode + Data Matrix
           const preprocessed = preprocessCanvas(frameCanvas);
           if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
           const result = await tryDecodeWithRotations(preprocessed, codeReader);
@@ -526,19 +539,24 @@
             showStatus('✅ Code captured', 'text-emerald-400');
             clearStatusAfter(2000);
             isAllInOneRunning = false;
-            resetButtonState(btn); hideScanGuide(); return;
+            resetButtonState(btn);
+            hideScanGuide();
+            return;
           }
         } catch (e) {}
 
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
+      // Finished without success
       if (isAllInOneRunning) {
         log('All-in-One: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
       }
+
       isAllInOneRunning = false;
-      resetButtonState(btn); hideScanGuide();
+      resetButtonState(btn);
+      hideScanGuide();
     }
 
     async function captureTextOCR() {
