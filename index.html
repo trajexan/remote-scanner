@@ -473,6 +473,7 @@
 
     // ==================== CAPTURE FUNCTIONS ====================
     async function captureBarcode() {
+      isAllInOneRunning = false;
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('barcode');
@@ -507,6 +508,7 @@
     }
 
     async function captureDataMatrix() {
+      isAllInOneRunning = false;
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('qrdm');
@@ -546,21 +548,27 @@
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
+      // === STOP if already running ===
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
         log('All-in-One stopped by user', 'warn');
         showStatus('Scanning stopped', 'text-amber-400');
-        resetButtonState(btn);
+        
+        // Force reset button text
+        btn.innerHTML = btn.dataset.originalText || '🔍 All-in-One';
+        btn.disabled = false;
+        btn.classList.remove('!bg-slate-700', 'cursor-wait');
         hideScanGuide();
         return;
       }
 
+      // Confirm before clearing existing value
       if (!confirmClearIfNeeded()) return;
 
       valueInput.value = '';
 
       isAllInOneRunning = true;
-      setButtonScanning(btn, '⏳ Scanning... (Click again to Stop)');
+      setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
       showScanGuide('all');
 
       const frameCanvas = getCurrentFrameCanvas();
@@ -571,7 +579,7 @@
         return;
       }
 
-      log('All-in-One started (max 100 attempts @ 350ms)', 'info');
+      log('All-in-One started (max 100 attempts)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
         if (!isAllInOneRunning) break;
@@ -613,6 +621,7 @@
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
+      // Finished all attempts or stopped
       if (isAllInOneRunning) {
         log('All-in-One: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
@@ -624,6 +633,7 @@
     }
 
     async function captureTextOCR() {
+      isAllInOneRunning = false;
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('qrdm');
@@ -661,6 +671,7 @@
     }
 
     function captureAndDecode() {
+      isAllInOneRunning = false;
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('all');
