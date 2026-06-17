@@ -540,32 +540,53 @@
       }
     }
 
+    let isAllInOneRunning = false;
+
     async function captureAllInOne() {
       const btn = event.currentTarget;
-      setButtonScanning(btn, '⏳ Scanning...');
-      showScanGuide('all');
 
-      const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) {
+      // If already running → Stop it
+      if (isAllInOneRunning) {
+        isAllInOneRunning = false;
+        log('All-in-One scanning stopped by user', 'warn');
+        showStatus('Scanning stopped', 'text-amber-400');
         resetButtonState(btn);
         hideScanGuide();
         return;
       }
 
-      log('All-in-One capture started (max 5 attempts)...', 'info');
+      // Start scanning
+      isAllInOneRunning = true;
+      setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
+      showScanGuide('all');
 
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        log(`Attempt ${attempt}/5`, 'info');
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) {
+        isAllInOneRunning = false;
+        resetButtonState(btn);
+        hideScanGuide();
+        return;
+      }
+
+      log('All-in-One started (max 100 attempts, click button again to stop)', 'info');
+
+      for (let attempt = 1; attempt <= 100; attempt++) {
+        if (!isAllInOneRunning) {
+          log('All-in-One stopped early', 'warn');
+          break;
+        }
 
         try {
-          // Try QR
+          // Try QR first
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
           if (qrResult && qrResult.data && qrResult.data.length > 0) {
             valueInput.value = qrResult.data;
-            log(`All-in-One: QR detected on attempt ${attempt}`, 'success');
+            log(`All-in-One: QR detected (attempt ${attempt})`, 'success');
             showStatus('✅ QR captured', 'text-emerald-400');
+            isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
             return;
@@ -578,25 +599,28 @@
 
           if (result && result.text && result.text.length > 0) {
             valueInput.value = result.text;
-            log(`All-in-One: Code detected on attempt ${attempt}`, 'success');
+            log(`All-in-One: Code detected (attempt ${attempt})`, 'success');
             showStatus('✅ Code captured', 'text-emerald-400');
+            isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
             return;
           }
         } catch (e) {
-          log(`Attempt ${attempt} error: ${e.message}`, 'warn');
+          // Ignore errors and continue
         }
 
-        // Small delay between attempts (optional but recommended)
-        if (attempt < 5) {
-          await new Promise(resolve => setTimeout(resolve, 120));
-        }
+        // Small delay so UI stays responsive
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // All attempts failed
-      log('All-in-One: No code found after 5 attempts', 'warn');
-      showStatus('No code detected after 5 attempts', 'text-amber-400');
+      // Finished all attempts or stopped
+      if (isAllInOneRunning) {
+        log('All-in-One: No code found after 100 attempts', 'warn');
+        showStatus('No code found after 100 attempts', 'text-amber-400');
+      }
+
+      isAllInOneRunning = false;
       resetButtonState(btn);
       hideScanGuide();
     }
