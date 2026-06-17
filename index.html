@@ -47,6 +47,13 @@
         <div class="scan-container aspect-video relative mb-4 border border-slate-700">
           <video id="video" class="w-full h-full" autoplay playsinline muted></video>
           <canvas id="canvas" style="display:none;"></canvas>
+              <!-- Dynamic Scan Guide Overlay -->
+              <div id="scanGuide" class="absolute inset-0 hidden items-center justify-center pointer-events-none">
+                <div id="guideBox"
+                     class="border-2 border-emerald-400 rounded-2xl transition-all duration-200"
+                     style="width: 70%; height: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);">
+                </div>
+              </div>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
@@ -233,6 +240,54 @@
     const valueInput = document.getElementById('valueInput');
     const logEl = document.getElementById('log');
 
+
+    // === Button State Helpers ===
+    function setButtonScanning(btn, text = '⏳ Scanning...') {
+      if (!btn) return;
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = text;
+      btn.disabled = true;
+      btn.classList.add('!bg-slate-700', 'cursor-wait');
+    }
+
+    function resetButtonState(btn) {
+      if (!btn) return;
+      btn.innerHTML = btn.dataset.originalText || 'Capture';
+      btn.disabled = false;
+      btn.classList.remove('!bg-slate-700', 'cursor-wait');
+    }
+
+    // === Dynamic Scan Guide ===
+    function showScanGuide(type = 'all') {
+      const guide = document.getElementById('scanGuide');
+      const box = document.getElementById('guideBox');
+      if (!guide || !box) return;
+
+      guide.classList.remove('hidden');
+      guide.classList.add('flex');
+
+      if (type === 'barcode') {
+        box.style.width = '78%';
+        box.style.height = '32%';
+        box.style.borderColor = '#3b82f6';
+      } else if (type === 'qrdm') {
+        box.style.width = '62%';
+        box.style.height = '58%';
+        box.style.borderColor = '#a855f7';
+      } else {
+        box.style.width = '68%';
+        box.style.height = '52%';
+        box.style.borderColor = '#10b981';
+      }
+    }
+
+    function hideScanGuide() {
+      const guide = document.getElementById('scanGuide');
+      if (guide) {
+        guide.classList.remove('flex');
+        guide.classList.add('hidden');
+      }
+    }
     function log(msg, type = 'info') {
       const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
       let color = 'text-slate-400';
@@ -465,24 +520,20 @@
 
     async function captureBarcode() {
       const btn = event.currentTarget;
-      if (btn) {
-        btn.disabled = true;
-        btn.dataset.originalText = btn.innerHTML;
-        btn.innerHTML = '⏳ Scanning...';
-        btn.classList.add('!bg-blue-800', 'cursor-wait');
-      }
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('barcode');
 
       const frameCanvas = getCurrentFrameCanvas();
       if (!frameCanvas) {
-        resetButton(btn);
+        resetButtonState(btn);
+        hideScanGuide();
         return;
       }
 
-      log('Scanning for Barcode with rotation support...', 'info');
+      log('Scanning for Barcode...', 'info');
 
       try {
         const preprocessed = preprocessCanvas(frameCanvas);
-
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
         const result = await tryDecodeWithRotations(preprocessed, codeReader);
 
@@ -491,57 +542,67 @@
           log('Barcode detected: ' + result.text, 'success');
           showStatus('✅ Barcode captured', 'text-emerald-400');
         } else {
-          log('No barcode found after rotation attempts', 'warn');
+          log('No barcode found', 'warn');
           showStatus('No barcode detected', 'text-amber-400');
         }
       } catch (e) {
-        log('Barcode scan error: ' + e.message, 'error');
+        log('Barcode error: ' + e.message, 'error');
       } finally {
-        if (btn) btn.disabled = false;
+        resetButtonState(btn);
+        hideScanGuide();
       }
     }
-
     async function captureDataMatrix() {
       const btn = event.currentTarget;
-      if (btn) btn.disabled = true;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('qrdm');
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
+      if (!frameCanvas) {
+        resetButtonState(btn);
+        hideScanGuide();
+        return;
+      }
 
       log('Scanning for Data Matrix...', 'info');
-      try {
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
 
-        const result = await codeReader.decodeFromImage(img);
+      try {
+        const preprocessed = preprocessCanvas(frameCanvas);
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const result = await tryDecodeWithRotations(preprocessed, codeReader);
+
         if (result && result.text) {
           valueInput.value = result.text;
           log('Data Matrix detected: ' + result.text, 'success');
           showStatus('✅ Data Matrix captured', 'text-emerald-400');
         } else {
-          log('No Data Matrix found in frame', 'warn');
+          log('No Data Matrix found', 'warn');
+          showStatus('No Data Matrix detected', 'text-amber-400');
         }
       } catch (e) {
-        log('Data Matrix scan error: ' + e.message, 'error');
+        log('Data Matrix error: ' + e.message, 'error');
       } finally {
-        if (btn) btn.disabled = false;
+        resetButtonState(btn);
+        hideScanGuide();
       }
     }
 
     async function captureAllInOne() {
       const btn = event.currentTarget;
-      if (btn) btn.disabled = true;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('all');
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
+      if (!frameCanvas) {
+        resetButtonState(btn);
+        hideScanGuide();
+        return;
+      }
 
       log('All-in-One capture started...', 'info');
 
-      // Try QR
       try {
+        // Try QR first
         const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
         const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -549,50 +610,40 @@
           valueInput.value = qrResult.data;
           log('All-in-One: QR detected', 'success');
           showStatus('✅ QR captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
           return;
         }
-      } catch (e) {}
 
-      // Try Barcode with rotation support
-      try {
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        // Try Barcode + Data Matrix with rotation
         const preprocessed = preprocessCanvas(frameCanvas);
-        const result = await tryDecodeWithRotations(preprocessed, codeReader);
-        if (result && result.text) {
-          valueInput.value = result.text;
-          log('All-in-One: Barcode detected', 'success');
-          showStatus('✅ Barcode captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
-          return;
-        }
-      } catch (e) {}
-
-      // Try Data Matrix
-      try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
-        const result = await codeReader.decodeFromImage(img);
+        const result = await tryDecodeWithRotations(preprocessed, codeReader);
+
         if (result && result.text) {
           valueInput.value = result.text;
-          log('All-in-One: Data Matrix detected', 'success');
-          showStatus('✅ Data Matrix captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
+          log('All-in-One: Code detected', 'success');
+          showStatus('✅ Code captured', 'text-emerald-400');
           return;
         }
-      } catch (e) {}
 
-      log('All-in-One: No code found', 'warn');
-      showStatus('No code detected', 'text-amber-400');
-      if (btn) btn.disabled = false;
+        log('All-in-One: No code found', 'warn');
+        showStatus('No code detected', 'text-amber-400');
+      } finally {
+        resetButtonState(btn);
+        hideScanGuide();
+      }
     }
 
     async function captureTextOCR() {
+      const btn = event.currentTarget;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('qrdm');
+
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) return;
+      if (!frameCanvas) {
+        resetButtonState(btn);
+        hideScanGuide();
+        return;
+      }
 
       log('Running OCR (this may take a few seconds on first run)...', 'info');
       showStatus('📝 Running OCR...', 'text-amber-400');
@@ -601,8 +652,10 @@
         if (!tesseractWorker) {
           tesseractWorker = await Tesseract.createWorker('eng');
         }
+
         const { data: { text } } = await tesseractWorker.recognize(frameCanvas);
         const cleanedText = text.trim();
+
         if (cleanedText) {
           valueInput.value = cleanedText;
           log('OCR result: ' + (cleanedText.length > 60 ? cleanedText.substring(0, 57) + '...' : cleanedText), 'success');
@@ -614,6 +667,9 @@
       } catch (e) {
         log('OCR error: ' + e.message, 'error');
         showStatus('OCR failed', 'text-red-400');
+      } finally {
+        resetButtonState(btn);
+        hideScanGuide();
       }
     }
 
