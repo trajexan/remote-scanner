@@ -142,74 +142,26 @@
   </div>
 
   <script>
-    // ==================== YOUR CREDENTIALS (same as switch page) ====================
-    const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
-    const CLIENT_SECRET = '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';
-    const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
-    const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
+    // ==================== YOUR CREDENTIALS ====================
+const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
+const CLIENT_SECRET = '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';
+const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
+const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
 
-    let currentStream = null;
-    let scanInterval = null;
-    let accessToken = null;
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const valueInput = document.getElementById('valueInput');
-    const logEl = document.getElementById('log');
-
-    function log(msg, type = 'info') {
-      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
-      let color = 'text-slate-400';
-      if (type === 'success') color = 'text-emerald-400';
-      if (type === 'error') color = 'text-red-400';
-      if (type === 'warn') color = 'text-amber-400';
-      
-      const line = document.createElement('div');
-      line.className = `${color} log-line`;
-      line.textContent = `[${time}] ${msg}`;
-      logEl.prepend(line);
-      while (logEl.children.length > 15) logEl.removeChild(logEl.lastChild);
-    }
-
-    function showStatus(msg, colorClass = 'text-slate-400') {
-      const el = document.getElementById('scanStatus');
-      el.innerHTML = msg;
-      el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl ${colorClass}`;
-    }
-
-    async function getAccessToken() {
-      try {
-        const res = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            refresh_token: REFRESH_TOKEN,
-            grant_type: 'refresh_token'
-          })
-        });
-        const data = await res.json();
-        if (data.access_token) {
-          accessToken = data.access_token;
-          document.getElementById('driveStatus').innerHTML = `
-            <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
-            <span class="text-emerald-400">Drive Connected</span>
-          `;
-          log('Access token refreshed successfully', 'success');
-          return accessToken;
-        } else {
-          throw new Error(data.error || 'Token refresh failed');
-        }
-      } catch (e) {
-        log('Token error: ' + e.message, 'error');
-        throw e;
-      }
-    }
+// === HARD CODE YOUR SYSTEM FOLDER ID HERE (recommended if auto-discovery fails) ===
+// Paste the ID you copied from drive.google.com above
+const SYSTEM_FOLDER_ID = '';   // ←←← PUT YOUR SYSTEM FOLDER ID HERE (leave empty to use auto-discovery)
 
 async function getSystemFolderId() {
+  if (SYSTEM_FOLDER_ID && SYSTEM_FOLDER_ID.length > 10) {
+    log('Using hardcoded SYSTEM folder ID: ' + SYSTEM_FOLDER_ID, 'success');
+    return SYSTEM_FOLDER_ID;
+  }
+
   if (!accessToken) await getAccessToken();
-  
+
   try {
+    // Try 1: Get parent of LISTENERS
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -217,19 +169,16 @@ async function getSystemFolderId() {
     const data = await res.json();
 
     if (data.error) {
-      log('Drive API error (parents): ' + JSON.stringify(data.error), 'error');
-      throw new Error(data.error.message || 'Drive API error getting parents');
-    }
-
-    if (data.parents && data.parents.length > 0) {
-      log('SYSTEM folder ID resolved via parents: ' + data.parents[0], 'success');
+      log('Parents lookup error: ' + JSON.stringify(data.error), 'error');
+    } else if (data.parents && data.parents.length > 0) {
+      log('SYSTEM folder resolved via LISTENERS parent: ' + data.parents[0], 'success');
       return data.parents[0];
     }
 
-    // Fallback: search by name "SYSTEM"
-    log('No parents returned — searching by folder name "SYSTEM"...', 'warn');
+    // Try 2: Search by exact name + folder mimeType
+    log('Parents failed — searching for folder named SYSTEM...', 'warn');
     const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM'&fields=files(id,name)`,
+      `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const searchData = await searchRes.json();
@@ -240,7 +189,7 @@ async function getSystemFolderId() {
       return folderId;
     }
 
-    throw new Error('Could not locate SYSTEM folder by parents or name search');
+    throw new Error('Could not locate SYSTEM folder (tried parents + name search)');
   } catch (e) {
     log('getSystemFolderId failed: ' + e.message, 'error');
     throw e;
