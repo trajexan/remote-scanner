@@ -165,11 +165,8 @@
       <div id="log" class="bg-black/60 border border-slate-800 rounded-2xl p-4 h-36 overflow-y-auto text-xs space-y-1 font-mono"></div>
     </div>
 
-    <p class="text-center text-[10px] text-slate-600 mt-8">v2.5 • Clean Version</p>
+    <p class="text-center text-[10px] text-slate-600 mt-8">v2.6 • No Blocker During Scan</p>
   </div>
-
-  <!-- Full Screen Blocker -->
-  <div id="scanBlocker" class="hidden fixed inset-0 z-[9999]" style="background: rgba(0,0,0,0.15); touch-action: none;"></div>
 
   <script>
     // ==================== CONFIG ====================
@@ -243,16 +240,6 @@
     function hideScanGuide() {
       const guide = document.getElementById('scanGuide');
       if (guide) { guide.classList.remove('flex'); guide.classList.add('hidden'); }
-    }
-
-    function enableScanBlocker() {
-      const blocker = document.getElementById('scanBlocker');
-      if (blocker) blocker.classList.remove('hidden');
-    }
-
-    function disableScanBlocker() {
-      const blocker = document.getElementById('scanBlocker');
-      if (blocker) blocker.classList.add('hidden');
     }
 
     function clearStatusAfter(ms = 2500) {
@@ -436,10 +423,9 @@
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('barcode');
-      enableScanBlocker();
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return; }
+      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); return; }
 
       log('Scanning for Barcode...', 'info');
       try {
@@ -455,7 +441,7 @@
           showStatus('No barcode detected', 'text-amber-400');
         }
       } catch (e) { log('Barcode error', 'error'); }
-      finally { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); }
+      finally { resetButtonState(btn); hideScanGuide(); }
     }
 
     async function captureDataMatrix() {
@@ -465,10 +451,9 @@
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('qrdm');
-      enableScanBlocker();
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return; }
+      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); return; }
 
       log('Scanning for Data Matrix...', 'info');
       try {
@@ -484,7 +469,7 @@
           showStatus('No Data Matrix detected', 'text-amber-400');
         }
       } catch (e) { log('Data Matrix error', 'error'); }
-      finally { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); }
+      finally { resetButtonState(btn); hideScanGuide(); }
     }
 
     async function captureAllInOne() {
@@ -496,7 +481,6 @@
         showStatus('Scanning stopped', 'text-amber-400');
         resetButtonState(btn);
         hideScanGuide();
-        disableScanBlocker();
         return;
       }
 
@@ -506,43 +490,46 @@
       isAllInOneRunning = true;
       setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
       showScanGuide('all');
-      enableScanBlocker();
 
       const frameCanvas = getCurrentFrameCanvas();
       if (!frameCanvas) {
         isAllInOneRunning = false;
-        resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return;
+        resetButtonState(btn); hideScanGuide(); return;
       }
 
       log('All-in-One started (max 100 attempts)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
         if (!isAllInOneRunning) break;
+
         try {
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
           if (qrResult && qrResult.data && qrResult.data.length > 0) {
             valueInput.value = qrResult.data;
             log(`All-in-One: QR detected (attempt ${attempt})`, 'success');
             showStatus('✅ QR captured', 'text-emerald-400');
             clearStatusAfter(2000);
             isAllInOneRunning = false;
-            resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return;
+            resetButtonState(btn); hideScanGuide(); return;
           }
 
           const preprocessed = preprocessCanvas(frameCanvas);
           if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
           const result = await tryDecodeWithRotations(preprocessed, codeReader);
+
           if (result && result.text && result.text.length > 0) {
             valueInput.value = result.text;
             log(`All-in-One: Code detected (attempt ${attempt})`, 'success');
             showStatus('✅ Code captured', 'text-emerald-400');
             clearStatusAfter(2000);
             isAllInOneRunning = false;
-            resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return;
+            resetButtonState(btn); hideScanGuide(); return;
           }
         } catch (e) {}
+
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
@@ -551,7 +538,7 @@
         showStatus('No code found after 100 attempts', 'text-amber-400');
       }
       isAllInOneRunning = false;
-      resetButtonState(btn); hideScanGuide(); disableScanBlocker();
+      resetButtonState(btn); hideScanGuide();
     }
 
     async function captureTextOCR() {
@@ -561,10 +548,9 @@
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('qrdm');
-      enableScanBlocker();
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return; }
+      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); return; }
 
       log('Running OCR...', 'info');
       showStatus('📝 Running OCR...', 'text-amber-400');
@@ -582,7 +568,7 @@
           showStatus('No text detected', 'text-amber-400');
         }
       } catch (e) { log('OCR error', 'error'); showStatus('OCR failed', 'text-red-400'); }
-      finally { resetButtonState(btn); hideScanGuide(); disableScanBlocker(); }
+      finally { resetButtonState(btn); hideScanGuide(); }
     }
 
     function captureAndDecode() {
@@ -592,10 +578,9 @@
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('all');
-      enableScanBlocker();
 
       if (!currentStream || !video.videoWidth) {
-        resetButtonState(btn); hideScanGuide(); disableScanBlocker(); return;
+        resetButtonState(btn); hideScanGuide(); return;
       }
 
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -612,7 +597,7 @@
         log('No QR found in frame', 'warn');
         showStatus('No QR detected', 'text-amber-400');
       }
-      resetButtonState(btn); hideScanGuide(); disableScanBlocker();
+      resetButtonState(btn); hideScanGuide();
     }
 
     // ==================== UPDATE RAW.TXT ====================
@@ -661,7 +646,7 @@
 
     // ==================== BOOT ====================
     window.onload = async function () {
-      log('Scanner loaded (Clean v2.5)');
+      log('Scanner loaded (v2.6 - No Blocker)');
       try {
         await getAccessToken();
         await loadCurrentRaw();
