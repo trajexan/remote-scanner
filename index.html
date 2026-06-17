@@ -472,10 +472,12 @@
       finally { resetButtonState(btn); hideScanGuide(); }
     }
 
+        let isAllInOneRunning = false;
+
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
-      // If already running → Stop it
+      // If already running → Stop
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
         log('All-in-One stopped by user', 'warn');
@@ -485,13 +487,24 @@
         return;
       }
 
-      // Confirmation before starting
+      // Confirmation
       if (!confirmClearIfNeeded()) {
         resetButtonState(btn);
+        // Try to resume video after dialog closes
+        if (video.paused) {
+          video.play().catch(() => {});
+        }
         return;
       }
 
       valueInput.value = '';
+
+      // Resume video after confirmation (in case dialog paused it)
+      if (video.paused) {
+        try {
+          await video.play();
+        } catch (e) {}
+      }
 
       isAllInOneRunning = true;
       setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
@@ -502,7 +515,6 @@
       for (let attempt = 1; attempt <= 100; attempt++) {
         if (!isAllInOneRunning) break;
 
-        // === Capture FRESH frame every attempt ===
         const frameCanvas = getCurrentFrameCanvas();
         if (!frameCanvas) {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -546,7 +558,6 @@
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
-      // Finished without success
       if (isAllInOneRunning) {
         log('All-in-One: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
