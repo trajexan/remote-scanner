@@ -415,6 +415,7 @@
         currentStream = stream;
         video.srcObject = stream;
         await video.play();
+        video.style.touchAction = 'manipulation';
         showStatus('🔴 Camera active (Auto QR detection disabled)', 'text-emerald-400');
         log('Camera started (continuous QR detection is OFF)', 'success');
       } catch (err) {
