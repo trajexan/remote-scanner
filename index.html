@@ -540,16 +540,12 @@
       }
     }
 
+    // ==================== ALL-IN-ONE (Fixed) ====================
     let isAllInOneRunning = false;
-
-    let isAllInOneRunning = false;
-
-        let isAllInOneRunning = false;
 
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
-      // If already running → Stop scanning
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
         log('All-in-One stopped by user', 'warn');
@@ -559,12 +555,8 @@
         return;
       }
 
-      // Confirm before clearing existing text
-      if (!confirmClearIfNeeded()) {
-        return;
-      }
+      if (!confirmClearIfNeeded()) return;
 
-      // Clear previous value
       valueInput.value = '';
 
       isAllInOneRunning = true;
@@ -582,9 +574,7 @@
       log('All-in-One started (max 100 attempts @ 350ms)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
-        if (!isAllInOneRunning) {
-          break;
-        }
+        if (!isAllInOneRunning) break;
 
         try {
           // Try QR
@@ -618,21 +608,85 @@
             hideScanGuide();
             return;
           }
-        } catch (e) {
-          // Continue to next attempt
-        }
+        } catch (e) {}
 
-        // 350ms delay between attempts (more reliable)
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
-      // All attempts exhausted
       if (isAllInOneRunning) {
         log('All-in-One: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
       }
 
       isAllInOneRunning = false;
+      resetButtonState(btn);
+      hideScanGuide();
+    }
+
+    async function captureTextOCR() {
+      const btn = event.currentTarget;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('qrdm');
+
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) {
+        resetButtonState(btn);
+        hideScanGuide();
+        return;
+      }
+
+      log('Running OCR...', 'info');
+      showStatus('📝 Running OCR...', 'text-amber-400');
+
+      try {
+        if (!tesseractWorker) tesseractWorker = await Tesseract.createWorker('eng');
+        const { data: { text } } = await tesseractWorker.recognize(frameCanvas);
+        const cleanedText = text.trim();
+
+        if (cleanedText) {
+          valueInput.value = cleanedText;
+          log('OCR result captured', 'success');
+          showStatus('✅ Text captured via OCR', 'text-emerald-400');
+        } else {
+          log('No readable text found', 'warn');
+          showStatus('No text detected', 'text-amber-400');
+        }
+      } catch (e) {
+        log('OCR error: ' + e.message, 'error');
+        showStatus('OCR failed', 'text-red-400');
+      } finally {
+        resetButtonState(btn);
+        hideScanGuide();
+      }
+    }
+
+    function captureAndDecode() {
+      const btn = event.currentTarget;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('all');
+
+      if (!currentStream || !video.videoWidth) {
+        resetButtonState(btn);
+        hideScanGuide();
+        log('Start camera first', 'warn');
+        return;
+      }
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+      if (code && code.data) {
+        valueInput.value = code.data;
+        showStatus('✅ QR captured', 'text-emerald-400');
+        log('QR detected (manual)', 'success');
+      } else {
+        log('No QR found in frame', 'warn');
+        showStatus('No QR detected', 'text-amber-400');
+      }
       resetButtonState(btn);
       hideScanGuide();
     }
@@ -765,7 +819,26 @@
       navigator.clipboard.writeText(logContent).then(() => log('Activity log copied', 'success'));
     }
 
+    
+        function clearStatusAfter(ms = 2500) {
+      setTimeout(() => {
+        const el = document.getElementById('scanStatus');
+        if (el && el.innerText.includes('✅')) {
+          el.innerHTML = 'Ready';
+          el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400`;
+        }
+      }, ms);
+    }
+
+    function confirmClearIfNeeded() {
+      const currentValue = valueInput.value.trim();
+      if (currentValue.length > 0) {
+        return confirm('There is existing text in the box.\nDo you want to clear it and start a new scan?');
+      }
+      return true;
+    }
     // ==================== BOOT ====================
+
     window.onload = async function () {
       log('Scanner loaded (Clean v2.3)');
       try {
@@ -784,23 +857,7 @@
       }
     });
 
-        function clearStatusAfter(ms = 2500) {
-      setTimeout(() => {
-        const el = document.getElementById('scanStatus');
-        if (el && el.innerText.includes('✅')) {
-          el.innerHTML = 'Ready';
-          el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400`;
-        }
-      }, ms);
-    }
 
-    function confirmClearIfNeeded() {
-      const currentValue = valueInput.value.trim();
-      if (currentValue.length > 0) {
-        return confirm('There is existing text in the box.\nDo you want to clear it and start a new scan?');
-      }
-      return true;
-    }
   </script>
 </body>
 </html>
