@@ -108,7 +108,20 @@
         </div>
       </div>
     </div>
-
+    <!-- Placement Guidance -->
+    <div class="mb-4 p-4 bg-slate-950 border border-slate-700 rounded-2xl">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-xl">📐</span>
+        <span class="font-semibold">Placement Tips</span>
+      </div>
+      <ul class="text-sm text-slate-300 space-y-1 pl-1">
+        <li>• Hold the code <strong>roughly straight</strong> (small tilt is okay)</li>
+        <li>• <strong>Barcode</strong>: Keep it horizontal. Avoid strong diagonal or vertical rotation.</li>
+        <li>• <strong>QR & Data Matrix</strong>: Any direction is usually fine (avoid extreme tilt).</li>
+        <li>• Make sure the code is well lit and not blurry.</li>
+        <li>• Keep some distance — don’t put the code too close to the camera.</li>
+      </ul>
+    </div>
     <!-- Advanced Capture Section -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
       <div class="flex items-center gap-3 mb-4">
@@ -352,11 +365,28 @@
     // ==================== CAMERA (QR part unchanged) ====================
     async function startCamera() {
       if (currentStream) {
-        // Camera is already running → Stop it
         stopCamera();
         return;
       }
 
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        currentStream = stream;
+        video.srcObject = stream;
+        await video.play();
+        showStatus('🔴 Camera active (Auto QR detection disabled)', 'text-emerald-400');
+        log('Camera started (continuous QR detection is OFF)', 'success');
+
+        // Continuous QR auto-detection is DISABLED
+        // startContinuousScanning();   // ← Commented out
+
+      } catch (err) {
+        showStatus('Camera error: ' + err.message, 'text-red-400');
+        log('Camera failed: ' + err.message, 'error');
+      }
+    }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -435,11 +465,16 @@
 
     async function captureBarcode() {
       const btn = event.currentTarget;
-      if (btn) btn.disabled = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.innerHTML;
+        btn.innerHTML = '⏳ Scanning...';
+        btn.classList.add('!bg-blue-800', 'cursor-wait');
+      }
 
       const frameCanvas = getCurrentFrameCanvas();
       if (!frameCanvas) {
-        if (btn) btn.disabled = false;
+        resetButton(btn);
         return;
       }
 
