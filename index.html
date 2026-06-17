@@ -160,14 +160,21 @@
 
     <!-- Activity Log -->
     <div class="mt-6 bg-slate-900 border border-slate-800 rounded-3xl p-5">
-      <div class="flex items-center gap-2 mb-3 px-1">
-        <span class="text-lg">📜</span>
-        <span class="font-semibold">Activity Log</span>
-      </div>
-      <button onclick="copyLog()" 
+      <div class="flex items-center justify-between mb-3 px-1">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">📜</span>
+          <span class="font-semibold">Activity Log</span>
+        </div>
+        <button onclick="copyLog()" 
                 class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-xl">
           📋 Copy Log
-      </button>
+        </button>
+      </div>
+
+      <!-- This was missing -->
+      <div id="log" 
+           class="bg-black/60 border border-slate-800 rounded-2xl p-4 h-36 overflow-y-auto text-xs space-y-1 font-mono">
+      </div>
     </div>
 
     <p class="text-center text-[10px] text-slate-600 mt-8">v2.2 • June 2026 • QR + Barcode + Data Matrix + OCR • GitHub Pages</p>
