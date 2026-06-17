@@ -250,18 +250,22 @@
     }
 
     function setButtonScanning(btn, text = '⏳ Scanning...') {
-      if (!btn) return;
-      btn.dataset.originalText = btn.innerHTML;
-      btn.innerHTML = text;
-      btn.disabled = true;
-      btn.classList.add('!bg-slate-700', 'cursor-wait');
+      if (btn) {
+        btn.dataset.originalText = btn.innerHTML;
+        btn.innerHTML = text;
+        btn.disabled = true;
+        btn.classList.add('!bg-slate-700', 'cursor-wait');
+      }
+      enableScanBlocker();           // ← Block everything
     }
 
     function resetButtonState(btn) {
-      if (!btn) return;
-      btn.innerHTML = btn.dataset.originalText || 'Capture';
-      btn.disabled = false;
-      btn.classList.remove('!bg-slate-700', 'cursor-wait');
+      if (btn) {
+        btn.innerHTML = btn.dataset.originalText || 'Capture';
+        btn.disabled = false;
+        btn.classList.remove('!bg-slate-700', 'cursor-wait');
+      }
+      disableScanBlocker();          // ← Re-enable interaction
     }
 
     function showScanGuide(type = 'all') {
@@ -751,6 +755,25 @@
         submitToRaw();
       }
     });
+
+    function enableScanBlocker() {
+      const blocker = document.getElementById('scanBlocker');
+      if (blocker) blocker.classList.remove('hidden');
+    }
+
+    function disableScanBlocker() {
+      const blocker = document.getElementById('scanBlocker');
+      if (blocker) blocker.classList.add('hidden');
+    }
+    
   </script>
+<!-- Full Screen Blocker (during scanning) -->
+<div id="scanBlocker" 
+     class="hidden fixed inset-0 bg-black/30 z-[9999] flex items-center justify-center">
+  <div class="bg-slate-900 text-white px-6 py-3 rounded-2xl text-sm flex items-center gap-3">
+    <span>⏳</span>
+    <span>Scanning... Please wait</span>
+  </div>
+</div>
 </body>
 </html>
