@@ -419,7 +419,10 @@
     async function captureBarcode() {
       isAllInOneRunning = false;
       const btn = event.currentTarget;
-      if (!confirmClearIfNeeded()) { resetButtonState(btn); return; }
+      if (!confirmClearIfNeeded()) { 
+        resetButtonState(btn); 
+        return; 
+      }
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('barcode');
@@ -447,7 +450,10 @@
     async function captureDataMatrix() {
       isAllInOneRunning = false;
       const btn = event.currentTarget;
-      if (!confirmClearIfNeeded()) { resetButtonState(btn); return; }
+      if (!confirmClearIfNeeded()) { 
+        resetButtonState(btn); 
+        return; 
+      }
       valueInput.value = '';
       setButtonScanning(btn, '⏳ Scanning...');
       showScanGuide('qrdm');
@@ -472,12 +478,9 @@
       finally { resetButtonState(btn); hideScanGuide(); }
     }
 
-        let isAllInOneRunning = false;
-
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
-      // If already running → Stop
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
         log('All-in-One stopped by user', 'warn');
@@ -487,23 +490,18 @@
         return;
       }
 
-      // Confirmation
       if (!confirmClearIfNeeded()) {
         resetButtonState(btn);
-        // Try to resume video after dialog closes
-        if (video.paused) {
-          video.play().catch(() => {});
-        }
+        // Resume video after dialog
+        if (video.paused) video.play().catch(() => {});
         return;
       }
 
       valueInput.value = '';
 
-      // Resume video after confirmation (in case dialog paused it)
+      // Resume video after confirmation
       if (video.paused) {
-        try {
-          await video.play();
-        } catch (e) {}
+        try { await video.play(); } catch (e) {}
       }
 
       isAllInOneRunning = true;
@@ -522,7 +520,6 @@
         }
 
         try {
-          // Try QR
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -538,7 +535,6 @@
             return;
           }
 
-          // Try Barcode + Data Matrix
           const preprocessed = preprocessCanvas(frameCanvas);
           if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
           const result = await tryDecodeWithRotations(preprocessed, codeReader);
@@ -566,6 +562,71 @@
       isAllInOneRunning = false;
       resetButtonState(btn);
       hideScanGuide();
+    }
+
+    async function captureTextOCR() {
+      isAllInOneRunning = false;
+      const btn = event.currentTarget;
+      if (!confirmClearIfNeeded()) { 
+        resetButtonState(btn); 
+        return; 
+      }
+      valueInput.value = '';
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('qrdm');
+
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) { resetButtonState(btn); hideScanGuide(); return; }
+
+      log('Running OCR...', 'info');
+      showStatus('📝 Running OCR...', 'text-amber-400');
+
+      try {
+        if (!tesseractWorker) tesseractWorker = await Tesseract.createWorker('eng');
+        const { data: { text } } = await tesseractWorker.recognize(frameCanvas);
+        const cleanedText = text.trim();
+        if (cleanedText) {
+          valueInput.value = cleanedText;
+          log('OCR result captured', 'success');
+          showStatus('✅ Text captured via OCR', 'text-emerald-400');
+        } else {
+          log('No readable text found', 'warn');
+          showStatus('No text detected', 'text-amber-400');
+        }
+      } catch (e) { log('OCR error', 'error'); showStatus('OCR failed', 'text-red-400'); }
+      finally { resetButtonState(btn); hideScanGuide(); }
+    }
+
+    function captureAndDecode() {
+      isAllInOneRunning = false;
+      const btn = event.currentTarget;
+      if (!confirmClearIfNeeded()) { 
+        resetButtonState(btn); 
+        return; 
+      }
+      valueInput.value = '';
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('all');
+
+      if (!currentStream || !video.videoWidth) {
+        resetButtonState(btn); hideScanGuide(); return;
+      }
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+      if (code && code.data) {
+        valueInput.value = code.data;
+        showStatus('✅ QR captured', 'text-emerald-400');
+        log('QR detected (manual)', 'success');
+      } else {
+        log('No QR found in frame', 'warn');
+        showStatus('No QR detected', 'text-amber-400');
+      }
+      resetButtonState(btn); hideScanGuide();
     }
 
     async function captureTextOCR() {
