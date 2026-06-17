@@ -6,9 +6,7 @@
   <title>Remote Scanner | SYSTEM raw.txt</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <!-- ZXing for Barcode + Data Matrix -->
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-  <!-- Tesseract.js for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     .log-line { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
@@ -24,14 +22,13 @@
         <h1 class="text-4xl font-bold tracking-tight">Remote Scanner</h1>
         <p class="text-slate-400 mt-1">QR + Text → <span class="font-mono text-emerald-400">SYSTEM\raw.txt</span></p>
       </div>
-      <div id="driveStatus" 
-           class="px-4 py-1.5 bg-slate-900 border border-slate-800 rounded-2xl text-sm flex items-center gap-2">
+      <div id="driveStatus" class="px-4 py-1.5 bg-slate-900 border border-slate-800 rounded-2xl text-sm flex items-center gap-2">
         <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
         <span class="text-emerald-400">Drive Connected</span>
       </div>
     </div>
 
-    <!-- QR Scanner (UNCHANGED) -->
+    <!-- QR Scanner -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
       <div class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
         <div class="flex items-center justify-between mb-4">
@@ -44,45 +41,44 @@
           </div>
         </div>
 
+        <!-- Video + Overlay -->
         <div class="scan-container aspect-video relative mb-4 border border-slate-700">
           <video id="video" class="w-full h-full" autoplay playsinline muted></video>
           <canvas id="canvas" style="display:none;"></canvas>
-              <!-- Dynamic Scan Guide Overlay -->
-              <div id="scanGuide" class="absolute inset-0 hidden items-center justify-center pointer-events-none">
-                <div id="guideBox"
-                     class="border-2 border-emerald-400 rounded-2xl transition-all duration-200"
-                     style="width: 70%; height: 50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);">
-                </div>
-              </div>
+
+          <!-- Dynamic Scan Guide Overlay -->
+          <div id="scanGuide" class="absolute inset-0 hidden items-center justify-center pointer-events-none">
+            <div id="guideBox"
+                 class="border-2 border-emerald-400 rounded-2xl transition-all duration-200"
+                 style="width: 68%; height: 52%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);">
+            </div>
+          </div>
         </div>
 
+        <!-- Buttons -->
         <div class="grid grid-cols-3 gap-3">
-          <!-- Start / Stop Toggle -->
           <button onclick="startCamera()" 
                   class="col-span-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-2">
             ▶ Start Camera
           </button>
 
-          <!-- All-in-One Capture (replaced Stop button) -->
           <button onclick="captureAllInOne()" 
                   class="col-span-1 py-3.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-2">
             🔍 All-in-One
           </button>
 
-          <!-- Manual QR Capture -->
           <button onclick="captureAndDecode()" 
                   class="col-span-1 py-3.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition-all rounded-2xl font-semibold flex items-center justify-center gap-2">
             📸 Capture Frame (QR)
           </button>
         </div>
-        
-        <div id="scanStatus" 
-             class="mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400">
+
+        <div id="scanStatus" class="mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400">
           Camera is off. Tap Start Camera.
         </div>
       </div>
 
-      <!-- Value Card (UNCHANGED) -->
+      <!-- Value Card -->
       <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col">
         <div class="flex items-center gap-3 mb-4">
           <div class="text-3xl">✏️</div>
@@ -103,18 +99,13 @@
           </button>
           
           <div class="grid grid-cols-2 gap-3">
-            <button onclick="copyValue()" 
-                    class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl font-semibold flex items-center justify-center gap-2">
-              📋 Copy
-            </button>
-            <button onclick="clearValue()" 
-                    class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl font-semibold flex items-center justify-center gap-2">
-              🧹 Clear
-            </button>
+            <button onclick="copyValue()" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl font-semibold flex items-center justify-center gap-2">📋 Copy</button>
+            <button onclick="clearValue()" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl font-semibold flex items-center justify-center gap-2">🧹 Clear</button>
           </div>
         </div>
       </div>
     </div>
+
     <!-- Placement Guidance -->
     <div class="mb-4 p-4 bg-slate-950 border border-slate-700 rounded-2xl">
       <div class="flex items-center gap-2 mb-2">
@@ -129,7 +120,8 @@
         <li>• Keep some distance — don’t put the code too close to the camera.</li>
       </ul>
     </div>
-    <!-- Advanced Capture Section -->
+
+    <!-- Advanced Capture -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
       <div class="flex items-center gap-3 mb-4">
         <div class="text-3xl">🔍</div>
@@ -140,34 +132,16 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <!-- Barcode -->
-        <button onclick="captureBarcode()" 
-                class="py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+        <button onclick="captureBarcode()" class="py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
           📊 Capture Barcode
         </button>
-        
-        <!-- Data Matrix -->
-        <button onclick="captureDataMatrix()" 
-                class="py-4 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+        <button onclick="captureDataMatrix()" class="py-4 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
           🔲 Capture Data Matrix
         </button>
-        
-        <!-- OCR (kept separate) -->
-        <button onclick="captureTextOCR()" 
-                class="py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+        <button onclick="captureTextOCR()" class="py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
           📝 Capture Text (OCR)
         </button>
       </div>
-
-      <!-- Placeholder space for future All-in-One button -->
-      <!-- 
-      <div class="mt-4">
-        <button onclick="captureAllInOne()" 
-                class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-3">
-          🔍 All-in-One Capture (QR → Barcode → DM)
-        </button>
-      </div>
-      -->
 
       <p class="text-xs text-slate-500 mt-3 text-center">
         Results appear in the text box above • You can still edit before updating raw.txt
@@ -184,14 +158,10 @@
             <p class="text-xs text-slate-500 font-mono">SYSTEM\raw.txt</p>
           </div>
         </div>
-        <button onclick="loadCurrentRaw()" 
-                class="px-5 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-2xl flex items-center gap-2">
-          ⟳ Refresh
-        </button>
+        <button onclick="loadCurrentRaw()" class="px-5 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-2xl flex items-center gap-2">⟳ Refresh</button>
       </div>
       
-      <div id="currentContent" 
-           class="bg-slate-950 border border-slate-800 rounded-2xl p-5 font-mono text-sm whitespace-pre-wrap break-all min-h-[80px] max-h-[220px] overflow-auto">
+      <div id="currentContent" class="bg-slate-950 border border-slate-800 rounded-2xl p-5 font-mono text-sm whitespace-pre-wrap break-all min-h-[80px] max-h-[220px] overflow-auto">
         Loading current content...
       </div>
       <div class="flex justify-between items-center mt-3 text-xs text-slate-500 px-1">
@@ -206,33 +176,26 @@
           <span class="text-lg">📜</span>
           <span class="font-semibold">Activity Log</span>
         </div>
-        <button onclick="copyLog()" 
-                class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-xl">
-          📋 Copy Log
-        </button>
+        <button onclick="copyLog()" class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-xl">📋 Copy Log</button>
       </div>
-
-      <!-- This was missing -->
-      <div id="log" 
-           class="bg-black/60 border border-slate-800 rounded-2xl p-4 h-36 overflow-y-auto text-xs space-y-1 font-mono">
-      </div>
+      <div id="log" class="bg-black/60 border border-slate-800 rounded-2xl p-4 h-36 overflow-y-auto text-xs space-y-1 font-mono"></div>
     </div>
 
-    <p class="text-center text-[10px] text-slate-600 mt-8">v2.2 • June 2026 • QR + Barcode + Data Matrix + OCR • GitHub Pages</p>
+    <p class="text-center text-[10px] text-slate-600 mt-8">v2.3 • June 2026 • Clean Version</p>
   </div>
 
   <script>
-    // ==================== CREDENTIALS & CONFIG (unchanged) ====================
+    // ==================== CONFIG ====================
     const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
     const CLIENT_SECRET = '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';
     const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
     const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
-    const SYSTEM_FOLDER_ID = '10n_Pv8YeMOYmlpwlAKRYN32wAU5ZWbRw'; // Paste your SYSTEM folder ID here if auto-discovery fails
+    const SYSTEM_FOLDER_ID = '10n_Pv8YeMOYmlpwlAKRYN32wAU5ZWbRw';
 
     let accessToken = null;
     let currentStream = null;
     let scanInterval = null;
-    let codeReader = null; // ZXing reader
+    let codeReader = null;
     let tesseractWorker = null;
 
     const video = document.getElementById('video');
@@ -240,8 +203,27 @@
     const valueInput = document.getElementById('valueInput');
     const logEl = document.getElementById('log');
 
+    // ==================== HELPERS ====================
+    function log(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      let color = 'text-slate-400';
+      if (type === 'success') color = 'text-emerald-400';
+      if (type === 'error') color = 'text-red-400';
+      if (type === 'warn') color = 'text-amber-400';
+      
+      const line = document.createElement('div');
+      line.className = `${color} log-line`;
+      line.textContent = `[${time}] ${msg}`;
+      logEl.prepend(line);
+      while (logEl.children.length > 15) logEl.removeChild(logEl.lastChild);
+    }
 
-    // === Button State Helpers ===
+    function showStatus(msg, colorClass = 'text-slate-400') {
+      const el = document.getElementById('scanStatus');
+      el.innerHTML = msg;
+      el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl ${colorClass}`;
+    }
+
     function setButtonScanning(btn, text = '⏳ Scanning...') {
       if (!btn) return;
       btn.dataset.originalText = btn.innerHTML;
@@ -257,7 +239,6 @@
       btn.classList.remove('!bg-slate-700', 'cursor-wait');
     }
 
-    // === Dynamic Scan Guide ===
     function showScanGuide(type = 'all') {
       const guide = document.getElementById('scanGuide');
       const box = document.getElementById('guideBox');
@@ -288,27 +269,8 @@
         guide.classList.add('hidden');
       }
     }
-    function log(msg, type = 'info') {
-      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
-      let color = 'text-slate-400';
-      if (type === 'success') color = 'text-emerald-400';
-      if (type === 'error') color = 'text-red-400';
-      if (type === 'warn') color = 'text-amber-400';
-      
-      const line = document.createElement('div');
-      line.className = `${color} log-line`;
-      line.textContent = `[${time}] ${msg}`;
-      logEl.prepend(line);
-      while (logEl.children.length > 15) logEl.removeChild(logEl.lastChild);
-    }
 
-    function showStatus(msg, colorClass = 'text-slate-400') {
-      const el = document.getElementById('scanStatus');
-      el.innerHTML = msg;
-      el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl ${colorClass}`;
-    }
-
-    // ==================== DRIVE FUNCTIONS (unchanged) ====================
+    // ==================== DRIVE ====================
     async function getAccessToken() {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -325,9 +287,8 @@
         if (data.access_token) {
           accessToken = data.access_token;
           return accessToken;
-        } else {
-          throw new Error(data.error || 'Token refresh failed');
         }
+        throw new Error(data.error || 'Token refresh failed');
       } catch (e) {
         log('Token error: ' + e.message, 'error');
         throw e;
@@ -364,7 +325,6 @@
         if (!accessToken) await getAccessToken();
         const systemFolderId = await getSystemFolderId();
 
-        // Delete existing raw* files
         const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name contains 'raw'`)}&fields=files(id)`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
@@ -378,7 +338,6 @@
           }
         }
 
-        // Create fresh file
         const metadata = { name: 'raw.txt', parents: [systemFolderId], mimeType: 'text/plain' };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -417,7 +376,7 @@
       }
     }
 
-    // ==================== CAMERA (QR part unchanged) ====================
+    // ==================== CAMERA ====================
     async function startCamera() {
       if (currentStream) {
         stopCamera();
@@ -433,25 +392,6 @@
         await video.play();
         showStatus('🔴 Camera active (Auto QR detection disabled)', 'text-emerald-400');
         log('Camera started (continuous QR detection is OFF)', 'success');
-
-        // Continuous QR auto-detection is DISABLED
-        // startContinuousScanning();   // ← Commented out
-
-      } catch (err) {
-        showStatus('Camera error: ' + err.message, 'text-red-400');
-        log('Camera failed: ' + err.message, 'error');
-      }
-    }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        currentStream = stream;
-        video.srcObject = stream;
-        await video.play();
-        showStatus('🔴 Live scanning active', 'text-emerald-400');
-        log('Camera started', 'success');
-        startContinuousScanning();
       } catch (err) {
         showStatus('Camera error: ' + err.message, 'text-red-400');
         log('Camera failed: ' + err.message, 'error');
@@ -465,47 +405,6 @@
       showStatus('Camera stopped.', 'text-slate-400');
     }
 
-    function startContinuousScanning() {
-      if (scanInterval) clearInterval(scanInterval);
-      scanInterval = setInterval(() => {
-        if (!video.videoWidth || video.paused) return;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, canvas.width, canvas.height);
-        if (code && code.data) {
-          clearInterval(scanInterval);
-          scanInterval = null;
-          handleDetectedQR(code.data);
-        }
-      }, 280);
-    }
-
-    function captureAndDecode() {
-      if (!currentStream || !video.videoWidth) { log('Start camera first', 'warn'); return; }
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, canvas.width, canvas.height);
-      if (code && code.data) {
-        handleDetectedQR(code.data);
-      } else {
-        log('No QR found in frame', 'warn');
-      }
-    }
-
-    function handleDetectedQR(data) {
-      valueInput.value = data;
-      valueInput.focus();
-      showStatus('✅ QR detected', 'text-emerald-400');
-      log('QR detected', 'success');
-    }
-
-    // ==================== NEW: Advanced Capture Functions ====================
     function getCurrentFrameCanvas() {
       if (!currentStream || !video.videoWidth) {
         log('Please start the camera first', 'warn');
@@ -518,6 +417,61 @@
       return canvas;
     }
 
+    // ==================== PREPROCESSING & ROTATION ====================
+    function preprocessCanvas(sourceCanvas) {
+      const width = sourceCanvas.width;
+      const height = sourceCanvas.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(sourceCanvas, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        let enhanced = ((gray - 128) * 1.35) + 128;
+        enhanced = Math.max(0, Math.min(255, enhanced));
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    async function tryDecodeWithRotations(sourceCanvas, zxingReader) {
+      const angles = [0, 6, -6, 180, 186, 174];
+      for (const angle of angles) {
+        const rotatedCanvas = document.createElement('canvas');
+        const ctx = rotatedCanvas.getContext('2d', { willReadFrequently: true });
+        const w = sourceCanvas.width;
+        const h = sourceCanvas.height;
+
+        rotatedCanvas.width = (angle === 0 || angle === 180) ? w : h;
+        rotatedCanvas.height = (angle === 0 || angle === 180) ? h : w;
+
+        ctx.save();
+        ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.drawImage(sourceCanvas, -w / 2, -h / 2, w, h);
+        ctx.restore();
+
+        try {
+          const dataUrl = rotatedCanvas.toDataURL('image/png');
+          const img = new Image();
+          img.src = dataUrl;
+          await new Promise(resolve => { img.onload = resolve; });
+          const result = await zxingReader.decodeFromImage(img);
+          if (result && result.text) return result;
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    // ==================== CAPTURE FUNCTIONS ====================
     async function captureBarcode() {
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
@@ -531,7 +485,6 @@
       }
 
       log('Scanning for Barcode...', 'info');
-
       try {
         const preprocessed = preprocessCanvas(frameCanvas);
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
@@ -552,6 +505,7 @@
         hideScanGuide();
       }
     }
+
     async function captureDataMatrix() {
       const btn = event.currentTarget;
       setButtonScanning(btn, '⏳ Scanning...');
@@ -565,7 +519,6 @@
       }
 
       log('Scanning for Data Matrix...', 'info');
-
       try {
         const preprocessed = preprocessCanvas(frameCanvas);
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
@@ -600,9 +553,8 @@
       }
 
       log('All-in-One capture started...', 'info');
-
       try {
-        // Try QR first
+        // Try QR
         const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
         const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -613,11 +565,10 @@
           return;
         }
 
-        // Try Barcode + Data Matrix with rotation
+        // Try Barcode + Data Matrix
         const preprocessed = preprocessCanvas(frameCanvas);
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
         const result = await tryDecodeWithRotations(preprocessed, codeReader);
-
         if (result && result.text) {
           valueInput.value = result.text;
           log('All-in-One: Code detected', 'success');
@@ -645,20 +596,17 @@
         return;
       }
 
-      log('Running OCR (this may take a few seconds on first run)...', 'info');
+      log('Running OCR...', 'info');
       showStatus('📝 Running OCR...', 'text-amber-400');
 
       try {
-        if (!tesseractWorker) {
-          tesseractWorker = await Tesseract.createWorker('eng');
-        }
-
+        if (!tesseractWorker) tesseractWorker = await Tesseract.createWorker('eng');
         const { data: { text } } = await tesseractWorker.recognize(frameCanvas);
         const cleanedText = text.trim();
 
         if (cleanedText) {
           valueInput.value = cleanedText;
-          log('OCR result: ' + (cleanedText.length > 60 ? cleanedText.substring(0, 57) + '...' : cleanedText), 'success');
+          log('OCR result captured', 'success');
           showStatus('✅ Text captured via OCR', 'text-emerald-400');
         } else {
           log('No readable text found', 'warn');
@@ -673,7 +621,38 @@
       }
     }
 
-    // ==================== EXISTING UPDATE & UI FUNCTIONS ====================
+    function captureAndDecode() {
+      const btn = event.currentTarget;
+      setButtonScanning(btn, '⏳ Scanning...');
+      showScanGuide('all');
+
+      if (!currentStream || !video.videoWidth) {
+        resetButtonState(btn);
+        hideScanGuide();
+        log('Start camera first', 'warn');
+        return;
+      }
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+      if (code && code.data) {
+        valueInput.value = code.data;
+        showStatus('✅ QR captured', 'text-emerald-400');
+        log('QR detected (manual)', 'success');
+      } else {
+        log('No QR found in frame', 'warn');
+        showStatus('No QR detected', 'text-amber-400');
+      }
+      resetButtonState(btn);
+      hideScanGuide();
+    }
+
+    // ==================== UPDATE RAW.TXT ====================
     async function submitToRaw() {
       const val = valueInput.value.trim();
       if (!val) { log('Enter or capture a value first', 'error'); return; }
@@ -722,13 +701,19 @@
       }
     }
 
-    // Boot
+    function copyLog() {
+      const logContent = logEl.innerText || logEl.textContent;
+      if (!logContent.trim()) { log('Log is empty', 'warn'); return; }
+      navigator.clipboard.writeText(logContent).then(() => log('Activity log copied', 'success'));
+    }
+
+    // ==================== BOOT ====================
     window.onload = async function () {
-      log('Scanner loaded with advanced capture features');
+      log('Scanner loaded (Clean v2.3)');
       try {
         await getAccessToken();
         await loadCurrentRaw();
-        log('Ready. QR, Barcode, Data Matrix and OCR are available.', 'success');
+        log('Ready. All capture features available.', 'success');
       } catch (e) {
         log('Startup error: ' + e.message, 'error');
       }
@@ -740,163 +725,6 @@
         submitToRaw();
       }
     });
-    function copyLog() {
-      const logContent = logEl.innerText || logEl.textContent;
-      if (!logContent.trim()) {
-        log('Log is empty', 'warn');
-        return;
-      }
-      navigator.clipboard.writeText(logContent).then(() => {
-        log('Activity log copied to clipboard', 'success');
-      }).catch(() => {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = logContent;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        log('Activity log copied (fallback)', 'success');
-      });
-    }
-
-async function captureAllInOne() {
-      const btn = event.currentTarget;
-      if (btn) btn.disabled = true;
-
-      const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
-
-      log('All-in-One capture started...', 'info');
-
-      // Try QR
-      try {
-        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
-        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
-        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-        if (qrResult && qrResult.data) {
-          valueInput.value = qrResult.data;
-          log('All-in-One: QR detected', 'success');
-          showStatus('✅ QR captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
-          return;
-        }
-      } catch (e) {}
-
-      // Try Barcode
-      try {
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
-        const result = await codeReader.decodeFromImage(img);
-        if (result && result.text) {
-          valueInput.value = result.text;
-          log('All-in-One: Barcode detected', 'success');
-          showStatus('✅ Barcode captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
-          return;
-        }
-      } catch (e) {}
-
-      // Try Data Matrix
-      try {
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
-        const result = await codeReader.decodeFromImage(img);
-        if (result && result.text) {
-          valueInput.value = result.text;
-          log('All-in-One: Data Matrix detected', 'success');
-          showStatus('✅ Data Matrix captured', 'text-emerald-400');
-          if (btn) btn.disabled = false;
-          return;
-        }
-      } catch (e) {}
-
-      log('All-in-One: No code found', 'warn');
-      showStatus('No code detected', 'text-amber-400');
-      if (btn) btn.disabled = false;
-    }
-
-    // Basic preprocessing: Grayscale + Contrast boost
-    function preprocessCanvas(sourceCanvas) {
-      const width = sourceCanvas.width;
-      const height = sourceCanvas.height;
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-      // Draw original
-      ctx.drawImage(sourceCanvas, 0, 0);
-
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-
-      // Grayscale + Contrast enhancement
-      for (let i = 0; i < data.length; i += 4) {
-        // Convert to grayscale
-        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        
-        // Simple contrast boost
-        let enhanced = ((gray - 128) * 1.35) + 128;
-        enhanced = Math.max(0, Math.min(255, enhanced));
-
-        data[i] = enhanced;
-        data[i + 1] = enhanced;
-        data[i + 2] = enhanced;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-      return canvas;
-    }
-
-    // Try decoding with multiple rotations (0° + 180° ± buffer)
-    async function tryDecodeWithRotations(sourceCanvas, zxingReader) {
-      const angles = [0, 6, -6, 180, 186, 174]; // 0° ±6° and 180° ±6°
-
-      for (const angle of angles) {
-        const rotatedCanvas = document.createElement('canvas');
-        const ctx = rotatedCanvas.getContext('2d', { willReadFrequently: true });
-
-        const w = sourceCanvas.width;
-        const h = sourceCanvas.height;
-
-        if (angle === 0 || angle === 180) {
-          rotatedCanvas.width = w;
-          rotatedCanvas.height = h;
-        } else {
-          rotatedCanvas.width = h;
-          rotatedCanvas.height = w;
-        }
-
-        ctx.save();
-        ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-        ctx.rotate((angle * Math.PI) / 180);
-        ctx.drawImage(sourceCanvas, -w / 2, -h / 2, w, h);
-        ctx.restore();
-
-        try {
-          const dataUrl = rotatedCanvas.toDataURL('image/png');
-          const img = new Image();
-          img.src = dataUrl;
-          await new Promise(resolve => { img.onload = resolve; });
-
-          const result = await zxingReader.decodeFromImage(img);
-          if (result && result.text) {
-            return result;
-          }
-        } catch (e) {
-          // Continue to next angle
-        }
-      }
-      return null;
-    }
   </script>
 </body>
 </html>
