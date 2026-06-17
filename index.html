@@ -542,22 +542,31 @@
 
     let isAllInOneRunning = false;
 
+    let isAllInOneRunning = false;
+
     async function captureAllInOne() {
       const btn = event.currentTarget;
 
-      // If already running → Stop it
+      // If already running → Stop scanning
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
-        log('All-in-One scanning stopped by user', 'warn');
+        log('All-in-One stopped by user', 'warn');
         showStatus('Scanning stopped', 'text-amber-400');
         resetButtonState(btn);
         hideScanGuide();
         return;
       }
 
-      // Start scanning
+      // Ask for confirmation if there's existing text
+      if (!confirmClearIfNeeded()) {
+        return;
+      }
+
+      // Clear old value before starting new scan
+      valueInput.value = '';
+
       isAllInOneRunning = true;
-      setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
+      setButtonScanning(btn, '⏳ Scanning... (Click again to Stop)');
       showScanGuide('all');
 
       const frameCanvas = getCurrentFrameCanvas();
@@ -568,16 +577,13 @@
         return;
       }
 
-      log('All-in-One started (max 100 attempts, click button again to stop)', 'info');
+      log('All-in-One started (max 100 attempts)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
-        if (!isAllInOneRunning) {
-          log('All-in-One stopped early', 'warn');
-          break;
-        }
+        if (!isAllInOneRunning) break;
 
         try {
-          // Try QR first
+          // Try QR
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -586,13 +592,14 @@
             valueInput.value = qrResult.data;
             log(`All-in-One: QR detected (attempt ${attempt})`, 'success');
             showStatus('✅ QR captured', 'text-emerald-400');
+            clearStatusAfter(2000);
             isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
             return;
           }
 
-          // Try Barcode + Data Matrix
+          // Try Barcode / Data Matrix
           const preprocessed = preprocessCanvas(frameCanvas);
           if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
           const result = await tryDecodeWithRotations(preprocessed, codeReader);
@@ -601,20 +608,18 @@
             valueInput.value = result.text;
             log(`All-in-One: Code detected (attempt ${attempt})`, 'success');
             showStatus('✅ Code captured', 'text-emerald-400');
+            clearStatusAfter(2000);
             isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
             return;
           }
-        } catch (e) {
-          // Ignore errors and continue
-        }
+        } catch (e) {}
 
-        // Small delay so UI stays responsive
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 90));
       }
 
-      // Finished all attempts or stopped
+      // Finished without finding anything
       if (isAllInOneRunning) {
         log('All-in-One: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
@@ -696,7 +701,10 @@
     // ==================== UPDATE RAW.TXT ====================
     async function submitToRaw() {
       const val = valueInput.value.trim();
-      if (!val) { log('Enter or capture a value first', 'error'); return; }
+      if (!val) {
+        log('Enter or capture a value first', 'error');
+        return;
+      }
 
       const btns = document.querySelectorAll('button');
       btns.forEach(b => b.disabled = true);
@@ -708,8 +716,10 @@
       if (result.success) {
         log('raw.txt updated successfully', 'success');
         showStatus('✅ raw.txt updated!', 'text-emerald-400');
+        clearStatusAfter(2000);
+
+        // Clear the board after successful upload
         valueInput.value = '';
-        await loadCurrentRaw();
       } else {
         log('Update failed: ' + result.error, 'error');
       }
@@ -766,6 +776,24 @@
         submitToRaw();
       }
     });
+
+        function clearStatusAfter(ms = 2500) {
+      setTimeout(() => {
+        const el = document.getElementById('scanStatus');
+        if (el && el.innerText.includes('✅')) {
+          el.innerHTML = 'Ready';
+          el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400`;
+        }
+      }, ms);
+    }
+
+    function confirmClearIfNeeded() {
+      const currentValue = valueInput.value.trim();
+      if (currentValue.length > 0) {
+        return confirm('There is existing text in the box.\nDo you want to clear it and start a new scan?');
+      }
+      return true;
+    }
   </script>
 </body>
 </html>
