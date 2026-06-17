@@ -438,23 +438,26 @@
       if (btn) btn.disabled = true;
 
       const frameCanvas = getCurrentFrameCanvas();
-      if (!frameCanvas) { if (btn) btn.disabled = false; return; }
+      if (!frameCanvas) {
+        if (btn) btn.disabled = false;
+        return;
+      }
 
-      log('Scanning for Barcode...', 'info');
+      log('Scanning for Barcode with rotation support...', 'info');
+
       try {
-        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
+        const preprocessed = preprocessCanvas(frameCanvas);
 
-        const result = await codeReader.decodeFromImage(img);
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const result = await tryDecodeWithRotations(preprocessed, codeReader);
+
         if (result && result.text) {
           valueInput.value = result.text;
           log('Barcode detected: ' + result.text, 'success');
           showStatus('✅ Barcode captured', 'text-emerald-400');
         } else {
-          log('No barcode found in frame', 'warn');
+          log('No barcode found after rotation attempts', 'warn');
+          showStatus('No barcode detected', 'text-amber-400');
         }
       } catch (e) {
         log('Barcode scan error: ' + e.message, 'error');
@@ -516,14 +519,11 @@
         }
       } catch (e) {}
 
-      // Try Barcode
+      // Try Barcode with rotation support
       try {
         if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-        const dataUrl = frameCanvas.toDataURL('image/png');
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise(resolve => { img.onload = resolve; });
-        const result = await codeReader.decodeFromImage(img);
+        const preprocessed = preprocessCanvas(frameCanvas);
+        const result = await tryDecodeWithRotations(preprocessed, codeReader);
         if (result && result.text) {
           valueInput.value = result.text;
           log('All-in-One: Barcode detected', 'success');
@@ -729,6 +729,82 @@ async function captureAllInOne() {
       log('All-in-One: No code found', 'warn');
       showStatus('No code detected', 'text-amber-400');
       if (btn) btn.disabled = false;
+    }
+
+    // Basic preprocessing: Grayscale + Contrast boost
+    function preprocessCanvas(sourceCanvas) {
+      const width = sourceCanvas.width;
+      const height = sourceCanvas.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      // Draw original
+      ctx.drawImage(sourceCanvas, 0, 0);
+
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+
+      // Grayscale + Contrast enhancement
+      for (let i = 0; i < data.length; i += 4) {
+        // Convert to grayscale
+        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        
+        // Simple contrast boost
+        let enhanced = ((gray - 128) * 1.35) + 128;
+        enhanced = Math.max(0, Math.min(255, enhanced));
+
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    // Try decoding with multiple rotations (0° + 180° ± buffer)
+    async function tryDecodeWithRotations(sourceCanvas, zxingReader) {
+      const angles = [0, 6, -6, 180, 186, 174]; // 0° ±6° and 180° ±6°
+
+      for (const angle of angles) {
+        const rotatedCanvas = document.createElement('canvas');
+        const ctx = rotatedCanvas.getContext('2d', { willReadFrequently: true });
+
+        const w = sourceCanvas.width;
+        const h = sourceCanvas.height;
+
+        if (angle === 0 || angle === 180) {
+          rotatedCanvas.width = w;
+          rotatedCanvas.height = h;
+        } else {
+          rotatedCanvas.width = h;
+          rotatedCanvas.height = w;
+        }
+
+        ctx.save();
+        ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.drawImage(sourceCanvas, -w / 2, -h / 2, w, h);
+        ctx.restore();
+
+        try {
+          const dataUrl = rotatedCanvas.toDataURL('image/png');
+          const img = new Image();
+          img.src = dataUrl;
+          await new Promise(resolve => { img.onload = resolve; });
+
+          const result = await zxingReader.decodeFromImage(img);
+          if (result && result.text) {
+            return result;
+          }
+        } catch (e) {
+          // Continue to next angle
+        }
+      }
+      return null;
     }
   </script>
 </body>
