@@ -18,7 +18,7 @@
     <div class="flex items-center justify-between mb-8">
       <div>
         <h1 class="text-4xl font-bold tracking-tight">Remote Scanner</h1>
-        <p class="text-slate-400 mt-1">QR + Text → <span class="font-mono text-emerald-400">SYSTEM\raw.txt</span> (Static)</p>
+        <p class="text-slate-400 mt-1">QR + Text → <span class="font-mono text-emerald-400">SYSTEM\raw.txt</span></p>
       </div>
       <div id="driveStatus" 
            class="px-4 py-1.5 bg-slate-900 border border-slate-800 rounded-2xl text-sm flex items-center gap-2">
@@ -108,7 +108,7 @@
           <div class="text-3xl">📄</div>
           <div>
             <h3 class="text-xl font-semibold">Current raw.txt in SYSTEM</h3>
-            <p class="text-xs text-slate-500 font-mono">SYSTEM\raw.txt (conflict-safe)</p>
+            <p class="text-xs text-slate-500 font-mono">SYSTEM\raw.txt (delete + fresh create)</p>
           </div>
         </div>
         <button onclick="loadCurrentRaw()" 
@@ -123,7 +123,7 @@
       </div>
       <div class="flex justify-between items-center mt-3 text-xs text-slate-500 px-1">
         <span id="lastUpdated"></span>
-        <span class="font-mono text-[10px]">Delete + fresh create (same pattern as switch.txt)</span>
+        <span class="font-mono text-[10px]">Matches your switch.txt robustness pattern</span>
       </div>
     </div>
 
@@ -138,90 +138,145 @@
       </div>
     </div>
 
-    <p class="text-center text-[10px] text-slate-600 mt-8">v2.0 Static • June 2026 • Uses your existing OAuth credentials • Hosted on GitHub Pages</p>
+    <p class="text-center text-[10px] text-slate-600 mt-8">v2.1 Static • June 2026 • GitHub Pages • Uses your existing OAuth credentials</p>
   </div>
 
   <script>
-    // ==================== YOUR CREDENTIALS ====================
-const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
-const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
-const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
+    // ==================== YOUR CREDENTIALS + CONFIG ====================
+    const CLIENT_ID = '935564408933-lpa834ga1pg02krbcf6gvql2gsv6912b.apps.googleusercontent.com';
+    const CLIENT_SECRET = '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';
+    const REFRESH_TOKEN = '1//04Jy95wK2sIn6CgYIARAAGAQSNwF-L9IrcalTh6F0QR-B60YV4wMoDFyT7KWHRgxx2-UTsawReZ0WWnZRZ_mFbMzQ8ytGPEZxG0M';
+    const LISTENERS_FOLDER_ID = '1T0fzt_EUexXx-WK1AzsXn8xughSmfZ_e';
 
-// === HARD CODE YOUR SYSTEM FOLDER ID HERE (recommended if auto-discovery fails) ===
-// Paste the ID you copied from drive.google.com above
-const SYSTEM_FOLDER_ID = '';   // ←←← PUT YOUR SYSTEM FOLDER ID HERE (leave empty to use auto-discovery)
+    // === HARD CODE YOUR SYSTEM FOLDER ID HERE (recommended) ===
+    // 1. Go to drive.google.com → open the SYSTEM folder that contains LISTENERS
+    // 2. Copy the long ID from the URL after /folders/
+    // 3. Paste it below and save
+    const SYSTEM_FOLDER_ID = '10n_Pv8YeMOYmlpwlAKRYN32wAU5ZWbRw';   // ←←← PASTE YOUR SYSTEM FOLDER ID HERE (leave empty for auto-discovery)
 
-async function getSystemFolderId() {
-  if (SYSTEM_FOLDER_ID && SYSTEM_FOLDER_ID.length > 10) {
-    log('Using hardcoded SYSTEM folder ID: ' + SYSTEM_FOLDER_ID, 'success');
-    return SYSTEM_FOLDER_ID;
-  }
+    let accessToken = null;
 
-  if (!accessToken) await getAccessToken();
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const valueInput = document.getElementById('valueInput');
+    const logEl = document.getElementById('log');
 
-  try {
-    // Try 1: Get parent of LISTENERS
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const data = await res.json();
-
-    if (data.error) {
-      log('Parents lookup error: ' + JSON.stringify(data.error), 'error');
-    } else if (data.parents && data.parents.length > 0) {
-      log('SYSTEM folder resolved via LISTENERS parent: ' + data.parents[0], 'success');
-      return data.parents[0];
+    function log(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      let color = 'text-slate-400';
+      if (type === 'success') color = 'text-emerald-400';
+      if (type === 'error') color = 'text-red-400';
+      if (type === 'warn') color = 'text-amber-400';
+      
+      const line = document.createElement('div');
+      line.className = `${color} log-line`;
+      line.textContent = `[${time}] ${msg}`;
+      logEl.prepend(line);
+      while (logEl.children.length > 15) logEl.removeChild(logEl.lastChild);
     }
 
-    // Try 2: Search by exact name + folder mimeType
-    log('Parents failed — searching for folder named SYSTEM...', 'warn');
-    const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const searchData = await searchRes.json();
-
-    if (searchData.files && searchData.files.length > 0) {
-      const folderId = searchData.files[0].id;
-      log('SYSTEM folder found by name search: ' + folderId, 'success');
-      return folderId;
+    function showStatus(msg, colorClass = 'text-slate-400') {
+      const el = document.getElementById('scanStatus');
+      el.innerHTML = msg;
+      el.className = `mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl ${colorClass}`;
     }
 
-    throw new Error('Could not locate SYSTEM folder (tried parents + name search)');
-  } catch (e) {
-    log('getSystemFolderId failed: ' + e.message, 'error');
-    throw e;
-  }
-}
+    async function getAccessToken() {
+      try {
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            refresh_token: REFRESH_TOKEN,
+            grant_type: 'refresh_token'
+          })
+        });
+        const data = await res.json();
+        if (data.access_token) {
+          accessToken = data.access_token;
+          document.getElementById('driveStatus').innerHTML = `
+            <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
+            <span class="text-emerald-400">Drive Connected</span>
+          `;
+          return accessToken;
+        } else {
+          throw new Error(data.error || 'Token refresh failed');
+        }
+      } catch (e) {
+        log('Token error: ' + e.message, 'error');
+        throw e;
+      }
+    }
+
+    async function getSystemFolderId() {
+      if (SYSTEM_FOLDER_ID && SYSTEM_FOLDER_ID.length > 10) {
+        log('Using hardcoded SYSTEM folder ID', 'success');
+        return SYSTEM_FOLDER_ID;
+      }
+
+      if (!accessToken) await getAccessToken();
+
+      try {
+        // Try 1: Get parent of LISTENERS
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${LISTENERS_FOLDER_ID}?fields=parents`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const data = await res.json();
+
+        if (!data.error && data.parents && data.parents.length > 0) {
+          log('SYSTEM folder resolved via LISTENERS parent', 'success');
+          return data.parents[0];
+        }
+
+        // Try 2: Search by exact name
+        log('Searching for folder named SYSTEM...', 'warn');
+        const searchRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=name='SYSTEM' and mimeType='application/vnd.google-apps.folder'&fields=files(id,name)`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const searchData = await searchRes.json();
+
+        if (searchData.files && searchData.files.length > 0) {
+          log('SYSTEM folder found by name search', 'success');
+          return searchData.files[0].id;
+        }
+
+        throw new Error('Could not locate SYSTEM folder');
+      } catch (e) {
+        log('Folder lookup failed: ' + e.message, 'error');
+        throw e;
+      }
+    }
 
     async function updateRawText(newValue) {
       if (!newValue || !newValue.trim()) {
-        log('Cannot submit empty value', 'error');
         return { success: false, error: 'Value cannot be empty' };
       }
+
       try {
         if (!accessToken) await getAccessToken();
         const systemFolderId = await getSystemFolderId();
 
-        // 1. Find and delete any existing raw* files (robustness)
+        // Delete any existing raw* files (robustness)
         const listRes = await fetch(
           `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name contains 'raw'`)}&fields=files(id,name)`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         const listData = await listRes.json();
+
         if (listData.files) {
           for (const file of listData.files) {
             await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
               method: 'DELETE',
               headers: { Authorization: `Bearer ${accessToken}` }
             });
-            log(`Deleted old file: ${file.name}`, 'warn');
           }
         }
 
-        // 2. Create fresh raw.txt
+        // Create fresh raw.txt
         const metadata = {
           name: 'raw.txt',
           parents: [systemFolderId],
@@ -240,15 +295,13 @@ async function getSystemFolderId() {
           }
         );
         const createData = await createRes.json();
-        
+
         if (createData.id) {
-          log('raw.txt created fresh successfully', 'success');
-          return { success: true, message: 'raw.txt updated', content: newValue.trim() };
+          return { success: true, message: 'raw.txt created fresh', content: newValue.trim() };
         } else {
           throw new Error(createData.error?.message || 'Create failed');
         }
       } catch (e) {
-        log('Update error: ' + e.message, 'error');
         return { success: false, error: e.message };
       }
     }
@@ -257,13 +310,15 @@ async function getSystemFolderId() {
       try {
         if (!accessToken) await getAccessToken();
         const systemFolderId = await getSystemFolderId();
-        const res = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name = 'raw.txt'`)}&fields=files(id,name,modifiedTime)`,
+
+        const listRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${systemFolderId}' in parents and name = 'raw.txt'`)}&fields=files(id,modifiedTime)`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
-        const data = await res.json();
-        if (data.files && data.files.length > 0) {
-          const file = data.files[0];
+        const listData = await listRes.json();
+
+        if (listData.files && listData.files.length > 0) {
+          const file = listData.files[0];
           const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
             headers: { Authorization: `Bearer ${accessToken}` }
           });
@@ -276,13 +331,9 @@ async function getSystemFolderId() {
       }
     }
 
-    // ==================== CAMERA & UI (same as before) ====================
-    function showDriveStatusConnected() {
-      document.getElementById('driveStatus').innerHTML = `
-        <div class="w-2 h-2 bg-emerald-400 rounded-full"></div>
-        <span class="text-emerald-400">Drive Connected</span>
-      `;
-    }
+    // ==================== CAMERA & UI ====================
+    let currentStream = null;
+    let scanInterval = null;
 
     async function startCamera() {
       try {
@@ -341,7 +392,7 @@ async function getSystemFolderId() {
       if (code && code.data) {
         handleDetectedQR(code.data);
       } else {
-        log('No QR found in frame', 'warn');
+        log('No QR found in current frame', 'warn');
       }
     }
 
@@ -349,27 +400,27 @@ async function getSystemFolderId() {
       valueInput.value = data;
       valueInput.focus();
       showStatus('✅ QR DETECTED — review & tap UPDATE', 'text-emerald-400');
-      log('QR detected: ' + (data.length > 50 ? data.substring(0,47)+'...' : data), 'success');
+      log('QR detected', 'success');
     }
 
     async function submitToRaw() {
       const val = valueInput.value.trim();
       if (!val) { log('Enter or scan a value first', 'error'); return; }
-      
+
       const btns = document.querySelectorAll('button');
       btns.forEach(b => b.disabled = true);
       log('Updating raw.txt via Drive API...');
-      
+
       const result = await updateRawText(val);
       btns.forEach(b => b.disabled = false);
-      
+
       if (result.success) {
         log('SUCCESS: raw.txt updated', 'success');
         showStatus('✅ raw.txt updated!', 'text-emerald-400');
         valueInput.value = '';
         await loadCurrentRaw();
       } else {
-        log('Failed: ' + result.error, 'error');
+        log('Update failed: ' + result.error, 'error');
       }
     }
 
@@ -378,19 +429,23 @@ async function getSystemFolderId() {
       if (!val) return;
       navigator.clipboard.writeText(val).then(() => log('Copied to clipboard', 'success'));
     }
-    function clearValue() { valueInput.value = ''; log('Cleared'); }
+
+    function clearValue() {
+      valueInput.value = '';
+      log('Cleared input');
+    }
 
     async function loadCurrentRaw() {
       const contentEl = document.getElementById('currentContent');
       const updatedEl = document.getElementById('lastUpdated');
       contentEl.innerHTML = 'Refreshing from Drive...';
-      
+
       const result = await getCurrentRawContent();
       if (result.success) {
         contentEl.textContent = result.content || '(empty)';
         if (result.lastUpdated) {
           const d = new Date(result.lastUpdated);
-          updatedEl.textContent = 'Last updated: ' + d.toLocaleString('en-GB', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+          updatedEl.textContent = 'Last updated: ' + d.toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
       } else {
         contentEl.innerHTML = `<span class="text-red-400">Error: ${result.error}</span>`;
@@ -398,19 +453,18 @@ async function getSystemFolderId() {
     }
 
     // Boot
-    window.onload = async function() {
-      log('Static scanner loaded. Initializing Drive connection...');
+    window.onload = async function () {
+      log('Static scanner loaded');
       try {
         await getAccessToken();
-        showDriveStatusConnected();
         await loadCurrentRaw();
-        log('Ready. Camera should now request permission normally.', 'success');
+        log('Ready. Camera + Drive connection initialized.', 'success');
       } catch (e) {
         log('Startup error: ' + e.message, 'error');
       }
     };
 
-    valueInput.addEventListener('keydown', function(e) {
+    valueInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         submitToRaw();
