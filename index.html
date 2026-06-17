@@ -105,33 +105,20 @@
     </div>
 
     <!-- NEW: Advanced Capture Section -->
-    <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="text-3xl">🔍</div>
-        <div>
-          <h2 class="text-2xl font-semibold">Advanced Capture (from current frame)</h2>
-          <p class="text-sm text-slate-400">Click a button below to scan the live camera view</p>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button onclick="captureBarcode()" 
-                class="py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
-          📊 Capture Barcode
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- All-in-One Button -->
+        <button onclick="captureAllInOne()" 
+                class="col-span-1 py-5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-lg">
+          🔍 All-in-One Capture<br>
+          <span class="text-sm font-normal">(QR → Barcode → Data Matrix)</span>
         </button>
         
-        <button onclick="captureDataMatrix()" 
-                class="py-4 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
-          🔲 Capture Data Matrix
-        </button>
-        
+        <!-- OCR stays separate -->
         <button onclick="captureTextOCR()" 
-                class="py-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
+                class="col-span-1 py-5 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-3">
           📝 Capture Text (OCR)
         </button>
       </div>
-      <p class="text-xs text-slate-500 mt-3 text-center">Results will appear in the text box above • You can still edit before updating raw.txt</p>
-    </div>
 
     <!-- Current raw.txt Status -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
@@ -577,6 +564,71 @@
         document.body.removeChild(textarea);
         log('Activity log copied (fallback)', 'success');
       });
+    }
+
+    async function captureAllInOne() {
+      const frameCanvas = getCurrentFrameCanvas();
+      if (!frameCanvas) return;
+
+      log('All-in-One capture started...', 'info');
+
+      // Step 1: Try QR first (fast)
+      try {
+        const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (qrResult && qrResult.data) {
+          valueInput.value = qrResult.data;
+          log('All-in-One: QR detected', 'success');
+          showStatus('✅ QR captured (All-in-One)', 'text-emerald-400');
+          return;
+        }
+      } catch (e) {
+        log('QR check error: ' + e.message, 'warn');
+      }
+
+      // Step 2: Try Barcode
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const dataUrl = frameCanvas.toDataURL('image/png');
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise(resolve => { img.onload = resolve; });
+
+        const barcodeResult = await codeReader.decodeFromImage(img);
+        if (barcodeResult && barcodeResult.text) {
+          valueInput.value = barcodeResult.text;
+          log('All-in-One: Barcode detected', 'success');
+          showStatus('✅ Barcode captured (All-in-One)', 'text-emerald-400');
+          return;
+        }
+      } catch (e) {
+        log('Barcode check error: ' + e.message, 'warn');
+      }
+
+      // Step 3: Try Data Matrix
+      try {
+        if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+        const dataUrl = frameCanvas.toDataURL('image/png');
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise(resolve => { img.onload = resolve; });
+
+        const dmResult = await codeReader.decodeFromImage(img);
+        if (dmResult && dmResult.text) {
+          valueInput.value = dmResult.text;
+          log('All-in-One: Data Matrix detected', 'success');
+          showStatus('✅ Data Matrix captured (All-in-One)', 'text-emerald-400');
+          return;
+        }
+      } catch (e) {
+        log('Data Matrix check error: ' + e.message, 'warn');
+      }
+
+      // Nothing found
+      log('All-in-One: No code found in frame', 'warn');
+      showStatus('No code detected', 'text-amber-400');
     }
   </script>
 </body>
