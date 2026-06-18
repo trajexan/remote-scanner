@@ -55,20 +55,19 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
-          <button onclick="startCamera()" class="col-span-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-2">
+        <!-- SIMPLIFIED: 2-button row - Start Camera + Combined Continuous Toggle -->
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="startCamera()" class="py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all rounded-2xl font-semibold text-lg flex items-center justify-center gap-2">
             ▶ Start Camera
           </button>
-          <button id="btn-all-in-one" onclick="captureAllInOne(this)" class="col-span-1 py-3.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-2">
-            🔍 All-in-One
-          </button>
-          <button onclick="captureAndDecode(this)" class="col-span-1 py-3.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 transition-all rounded-2xl font-semibold flex items-center justify-center gap-2">
-            📸 Capture Frame (QR)
+          <button id="btn-continuous" onclick="toggleContinuousScan(this)" 
+                  class="py-3.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all rounded-2xl font-bold text-lg flex items-center justify-center gap-2">
+            🔄 Continuous Scan
           </button>
         </div>
 
         <div id="scanStatus" class="mt-3 text-center text-sm py-2 px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400">
-          Camera is off. Tap Start Camera.
+          Camera is off. Tap Start Camera or Continuous Scan.
         </div>
       </div>
 
@@ -111,13 +110,13 @@
       </ul>
     </div>
 
-    <!-- Advanced Capture -->
+    <!-- Advanced One-Shot Capture (fallback) -->
     <div class="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
       <div class="flex items-center gap-3 mb-4">
         <div class="text-3xl">🔍</div>
         <div>
-          <h2 class="text-2xl font-semibold">Advanced Capture</h2>
-          <p class="text-sm text-slate-400">Click a button to scan the live camera view</p>
+          <h2 class="text-2xl font-semibold">Advanced One-Shot Capture</h2>
+          <p class="text-sm text-slate-400">Specific type only (Barcode / Data Matrix / OCR)</p>
         </div>
       </div>
 
@@ -166,10 +165,10 @@
       <div id="log" class="bg-black/60 border border-slate-800 rounded-2xl p-4 h-36 overflow-y-auto text-xs space-y-1 font-mono"></div>
     </div>
 
-    <p class="text-center text-[10px] text-slate-600 mt-8">v2.7 • Custom Modal • Video Never Freezes</p>
+    <p class="text-center text-[10px] text-slate-600 mt-8">v2.8 • Combined Toggle • Custom Modal • Video Never Freezes</p>
   </div>
 
-  <!-- Custom Confirmation Modal (non-blocking — this is the fix) -->
+  <!-- Custom Confirmation Modal (non-blocking) -->
   <div id="confirmModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center" style="z-index: 9999;">
     <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full mx-4 shadow-2xl">
       <div class="flex items-center gap-3 mb-4">
@@ -242,7 +241,20 @@
       if (!btn) return;
       btn.innerHTML = btn.dataset.originalText || 'Capture';
       btn.disabled = false;
-      btn.classList.remove('!bg-slate-700', 'cursor-wait');
+      btn.classList.remove('!bg-slate-700', 'cursor-wait', 'bg-rose-600', 'hover:bg-rose-500');
+      if (btn.id === 'btn-continuous') {
+        btn.classList.add('bg-sky-600', 'hover:bg-sky-500');
+      }
+    }
+
+    // Special active state for continuous toggle — keeps button clickable (this fixes the re-press bug)
+    function setContinuousButtonActive(btn) {
+      if (!btn) return;
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = '⏹ Stop Continuous Scan';
+      btn.classList.remove('bg-sky-600', 'hover:bg-sky-500');
+      btn.classList.add('bg-rose-600', 'hover:bg-rose-500');
+      // deliberately NOT setting disabled = true
     }
 
     function showScanGuide(type = 'all') {
@@ -276,7 +288,7 @@
       }, ms);
     }
 
-    // ==================== CUSTOM NON-BLOCKING MODAL (THE FIX) ====================
+    // ==================== CUSTOM NON-BLOCKING MODAL ====================
     function showConfirmModal(message) {
       return new Promise((resolve) => {
         const modal = document.getElementById('confirmModal');
@@ -297,25 +309,13 @@
           modal.onclick = null;
         };
 
-        yesBtn.onclick = () => {
-          cleanup();
-          resolve(true);
-        };
+        yesBtn.onclick = () => { cleanup(); resolve(true); };
+        noBtn.onclick = () => { cleanup(); resolve(false); };
 
-        noBtn.onclick = () => {
-          cleanup();
-          resolve(false);
-        };
-
-        // Click on backdrop closes modal (No)
         modal.onclick = (e) => {
-          if (e.target === modal) {
-            cleanup();
-            resolve(false);
-          }
+          if (e.target === modal) { cleanup(); resolve(false); }
         };
 
-        // ESC key = No
         const handleEsc = (e) => {
           if (e.key === 'Escape') {
             document.removeEventListener('keydown', handleEsc);
@@ -490,35 +490,41 @@
       return null;
     }
 
-    // ==================== CAPTURE FUNCTIONS (ALL REFACTORED) ====================
+    // ==================== COMBINED CONTINUOUS TOGGLE (replaces old All-in-One + fixes re-press) ====================
+    async function toggleContinuousScan(btn) {
+      if (!btn) btn = document.getElementById('btn-continuous');
 
-    async function captureAllInOne(btn) {
-      if (!btn) btn = document.getElementById('btn-all-in-one');
-
-      // If already running → Stop it cleanly (no confirmation needed)
+      // STOP path — user pressed the active button again
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
-        log('All-in-One stopped by user', 'warn');
-        showStatus('Scanning stopped', 'text-amber-400');
+        log('Continuous scan stopped by user', 'warn');
+        showStatus('Continuous scan stopped — camera off', 'text-amber-400');
         resetButtonState(btn);
         hideScanGuide();
+        stopCamera();           // As requested: press again also stops the camera
         return;
       }
 
-      // Non-blocking confirmation — video keeps playing
+      // START path
       const shouldProceed = await confirmClearIfNeeded();
-      if (!shouldProceed) {
-        // User clicked No → button never left normal state. Perfect.
-        return;
-      }
+      if (!shouldProceed) return;
 
       valueInput.value = '';
 
+      // Auto start camera if needed (nice UX)
+      if (!currentStream) {
+        await startCamera();
+        if (!currentStream) {
+          resetButtonState(btn);
+          return;
+        }
+      }
+
       isAllInOneRunning = true;
-      setButtonScanning(btn, '⏳ Scanning... (Click to Stop)');
+      setContinuousButtonActive(btn);
       showScanGuide('all');
 
-      log('All-in-One started (fresh frame every attempt)', 'info');
+      log('Continuous Smart Scan started (fresh frame every 350ms)', 'info');
 
       for (let attempt = 1; attempt <= 100; attempt++) {
         if (!isAllInOneRunning) break;
@@ -530,32 +536,33 @@
         }
 
         try {
-          // Try QR first (fast path)
+          // QR fast path
           const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
           const imageData = ctx.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
           const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
 
           if (qrResult && qrResult.data && qrResult.data.length > 0) {
             valueInput.value = qrResult.data;
-            log(`All-in-One: QR detected (attempt ${attempt})`, 'success');
-            showStatus('✅ QR captured', 'text-emerald-400');
-            clearStatusAfter(2000);
+            log(`Continuous Scan: QR detected (attempt ${attempt})`, 'success');
+            showStatus('✅ QR captured — ready to submit', 'text-emerald-400');
+            clearStatusAfter(3000);
             isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
+            // Camera stays running after success
             return;
           }
 
-          // Try Barcode + Data Matrix
+          // Barcode / Data Matrix
           const preprocessed = preprocessCanvas(frameCanvas);
           if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
           const result = await tryDecodeWithRotations(preprocessed, codeReader);
 
           if (result && result.text && result.text.length > 0) {
             valueInput.value = result.text;
-            log(`All-in-One: Code detected (attempt ${attempt})`, 'success');
-            showStatus('✅ Code captured', 'text-emerald-400');
-            clearStatusAfter(2000);
+            log(`Continuous Scan: Code detected (attempt ${attempt})`, 'success');
+            showStatus('✅ Code captured — ready to submit', 'text-emerald-400');
+            clearStatusAfter(3000);
             isAllInOneRunning = false;
             resetButtonState(btn);
             hideScanGuide();
@@ -566,26 +573,27 @@
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
-      // Finished without success
+      // Natural completion (no code after 100 attempts)
       if (isAllInOneRunning) {
-        log('All-in-One: No code found after 100 attempts', 'warn');
+        log('Continuous Scan: No code found after 100 attempts', 'warn');
         showStatus('No code found after 100 attempts', 'text-amber-400');
       }
 
       isAllInOneRunning = false;
       resetButtonState(btn);
       hideScanGuide();
+      // Camera stays on
     }
 
+    // ==================== ONE-SHOT FALLBACK FUNCTIONS ====================
     async function captureBarcode(btn) {
       if (!btn) return;
 
-      // Stop All-in-One if it is currently running
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
-        const aioBtn = document.getElementById('btn-all-in-one');
-        if (aioBtn) resetButtonState(aioBtn);
-        log('All-in-One stopped (another scan started)', 'warn');
+        const contBtn = document.getElementById('btn-continuous');
+        if (contBtn) resetButtonState(contBtn);
+        log('Continuous scan stopped (one-shot started)', 'warn');
       }
 
       const shouldProceed = await confirmClearIfNeeded();
@@ -620,9 +628,9 @@
 
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
-        const aioBtn = document.getElementById('btn-all-in-one');
-        if (aioBtn) resetButtonState(aioBtn);
-        log('All-in-One stopped (another scan started)', 'warn');
+        const contBtn = document.getElementById('btn-continuous');
+        if (contBtn) resetButtonState(contBtn);
+        log('Continuous scan stopped (one-shot started)', 'warn');
       }
 
       const shouldProceed = await confirmClearIfNeeded();
@@ -657,9 +665,9 @@
 
       if (isAllInOneRunning) {
         isAllInOneRunning = false;
-        const aioBtn = document.getElementById('btn-all-in-one');
-        if (aioBtn) resetButtonState(aioBtn);
-        log('All-in-One stopped (another scan started)', 'warn');
+        const contBtn = document.getElementById('btn-continuous');
+        if (contBtn) resetButtonState(contBtn);
+        log('Continuous scan stopped (one-shot started)', 'warn');
       }
 
       const shouldProceed = await confirmClearIfNeeded();
@@ -689,44 +697,6 @@
         }
       } catch (e) { log('OCR error', 'error'); showStatus('OCR failed', 'text-red-400'); }
       finally { resetButtonState(btn); hideScanGuide(); }
-    }
-
-    async function captureAndDecode(btn) {
-      if (!btn) return;
-
-      if (isAllInOneRunning) {
-        isAllInOneRunning = false;
-        const aioBtn = document.getElementById('btn-all-in-one');
-        if (aioBtn) resetButtonState(aioBtn);
-        log('All-in-One stopped (another scan started)', 'warn');
-      }
-
-      const shouldProceed = await confirmClearIfNeeded();
-      if (!shouldProceed) return;
-
-      valueInput.value = '';
-      setButtonScanning(btn, '⏳ Scanning...');
-      showScanGuide('all');
-
-      if (!currentStream || !video.videoWidth) {
-        resetButtonState(btn); hideScanGuide(); return;
-      }
-
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, canvas.width, canvas.height);
-
-      if (code && code.data) {
-        valueInput.value = code.data;
-        showStatus('✅ QR captured', 'text-emerald-400');
-        log('QR detected (manual)', 'success');
-      } else {
-        log('No QR found in frame', 'warn');
-        showStatus('No QR detected', 'text-amber-400');
-      }
-      resetButtonState(btn); hideScanGuide();
     }
 
     // ==================== UPDATE RAW.TXT ====================
@@ -775,11 +745,11 @@
 
     // ==================== BOOT ====================
     window.onload = async function () {
-      log('Scanner loaded (v2.7 - Custom Modal • No Video Freeze)');
+      log('Scanner loaded (v2.8 - Combined Toggle Button • No Video Freeze)');
       try {
         await getAccessToken();
         await loadCurrentRaw();
-        log('Ready. Click any scan button — video will stay smooth.', 'success');
+        log('Ready. Continuous Scan button now toggles cleanly and stops camera on second press.', 'success');
       } catch (e) { log('Startup error', 'error'); }
     };
 
